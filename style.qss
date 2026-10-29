@@ -1,0 +1,576 @@
+/* --- Global --- */
+QWidget {
+    background-color: #12151C; 
+    color: #E2E8F0; 
+    font-family: "Segoe UI", "Inter", sans-serif;
+    font-size: 14px;
+}
+
+/* --- Sidebar --- */
+#sidebar {
+    background-color: #0B0E14;
+    border-right: 1px solid #1F2430;
+}
+
+#logo {
+    font-size: 22px;
+    font-weight: bold;
+    color: #00E5FF; 
+    background: transparent;
+}
+
+#navButton {
+    background-color: transparent;
+    border: none;
+    text-align: left;
+    padding: 10px 15px;
+    font-size: 15px;
+    color: #94A3B8;
+    border-radius: 6px;
+}
+
+#navButton:hover {
+    background-color: #1A1F2B;
+    color: #FFFFFF;
+}
+
+/* --- Content Area --- */
+#contentArea {
+    background-color: #12151C;
+}
+
+#pageTitle {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #FFFFFF;
+}
+
+/* --- Lists & Tables --- */
+#trackList, #songsTable {
+    background-color: transparent;
+    border: none;
+    outline: none;
+    color: #CBD5E1;
+}
+
+#trackList::item {
+    padding: 12px 10px;
+    border-radius: 6px;
+    color: #CBD5E1;
+}
+
+#trackList::item:hover, #songsTable::item:hover {
+    background-color: #1A1F2B;
+}
+
+#trackList::item:selected, #songsTable::item:selected {
+    background-color: #0F2A3F;
+    color: #00E5FF;
+}
+
+#songsTable::item {
+    padding: 8px;
+    border-bottom: 1px solid #1A1F2B;
+}
+
+QHeaderView::section {
+    background-color: #12151C;
+    color: #94A3B8;
+    padding: 8px;
+    border: none;
+    border-bottom: 2px solid #1A1F2B;
+    font-weight: bold;
+}
+
+/* --- Search --- */
+#searchInput {
+    background-color: #1A1F2B;
+    border: 2px solid #1F2430;
+    border-radius: 16px;
+    padding: 8px 15px;
+    font-size: 14px;
+    color: #FFFFFF;
+}
+#searchInput:focus {
+    border: 2px solid #00E5FF;
+}
+
+#contentStack {
+    background: transparent;
+    border: none;
+}
+
+/* =========================================
+   --- BOTTOM NOW PLAYING BAR ---
+   ========================================= */
+#nowPlayingBar {
+    background-color: #0B0E14; 
+    border-top: 1px solid #1F2430;
+}
+
+#nowPlayingBar QLabel {
+    background-color: transparent;
+}
+
+#albumArt {
+    background-color: transparent;
+    border-radius: 6px;
+}
+
+#npTitle {
+    font-size: 14px;
+    font-weight: bold;
+    color: #FFFFFF;
+}
+
+#npArtistBtn {
+    background: transparent;
+    border: none;
+    font-size: 12px;
+    color: #94A3B8;
+    padding: 0;
+    margin: 0;
+}
+#npArtistBtn:hover {
+    color: #00E5FF;
+    text-decoration: underline;
+}
+
+#timeLabel {
+    color: #64748B;
+    font-size: 11px;
+    font-family: "Consolas", monospace; 
+    min-width: 35px;
+    qproperty-alignment: AlignCenter;
+}
+
+#smallCtrlBtn {
+    background: transparent;
+    border: none;
+    font-size: 11px;
+    font-weight: bold;
+    color: #64748B;
+    padding: 4px;
+}
+#smallCtrlBtn:hover {
+    color: #FFFFFF;
+}
+
+#controlBtn {
+    background: transparent;
+    border: none;
+    font-size: 14px;
+    font-weight: bold;
+    color: #94A3B8;
+    padding: 4px;
+}
+#controlBtn:hover {
+    color: #FFFFFF;
+}
+
+#playBtn {
+    background-color: #FFFFFF;
+    color: #000000;
+    border-radius: 18px; 
+    font-size: 14px;
+    min-width: 36px;
+    max-width: 36px;
+    min-height: 36px;
+    max-height: 36px;
+    padding: 0;
+    margin: 0 12px;
+}
+#playBtn:hover {
+    background-color: #E2E8F0;
+}
+
+#seekBar, #volumeBar {
+    background: transparent;
+}
+
+#seekBar::groove:horizontal {
+    border: none;
+    height: 4px;
+    background: #2A303C;
+    border-radius: 2px;
+}
+#seekBar::sub-page:horizontal {
+    background: #FFFFFF;
+    border-radius: 2px;
+}
+#seekBar::handle:horizontal {
+    background: #FFFFFF;
+    width: 12px;
+    height: 12px;
+    margin: -4px 0; 
+    border-radius: 6px;
+}
+#seekBar::handle:horizontal:hover {
+    background: #00E5FF;
+    width: 14px;
+    height: 14px;
+    margin: -5px 0;
+    border-radius: 7px;
+}
+
+#volumeBar::groove:horizontal {
+    border: none;
+    height: 4px;
+    background: #2A303C;
+    border-radius: 2px;
+}
+#volumeBar::sub-page:horizontal {
+    background: #FFFFFF;
+    border-radius: 2px;
+}
+#volumeBar::handle:horizontal {
+    background: #FFFFFF;
+    width: 10px;
+    height: 10px;
+    margin: -3px 0; 
+    border-radius: 5px;
+}
+#volumeBar::handle:horizontal:hover {
+    background: #00E5FF;
+    width: 12px;
+    height: 12px;
+    margin: -4px 0;
+    border-radius: 6px;
+}
+
+/* =========================================
+   --- CUSTOM SCROLLBARS ---
+   ========================================= */
+
+/* The main track */
+QScrollBar:vertical {
+    border: none;
+    background: transparent;
+    width: 10px;
+    margin: 0px;
+}
+
+/* The scrolling handle (the part you drag) */
+QScrollBar::handle:vertical {
+    background: #2A303C; /* Dark grey normally */
+    min-height: 30px;
+    border-radius: 5px; /* Perfectly rounded edges */
+}
+
+/* When you hover over the handle, it glows cyan */
+QScrollBar::handle:vertical:hover {
+    background: #00E5FF; 
+}
+
+/* When you are actively dragging it */
+QScrollBar::handle:vertical:pressed {
+    background: #66F0FF; 
+}
+
+/* Hide the ugly up/down arrows */
+QScrollBar::add-line:vertical {
+    border: none;
+    background: none;
+    height: 0px;
+}
+
+QScrollBar::sub-line:vertical {
+    border: none;
+    background: none;
+    height: 0px;
+}
+
+/* Hide the background of the space where the arrows used to be */
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+/* Horizontal scrollbar (just in case) */
+QScrollBar:horizontal {
+    border: none;
+    background: transparent;
+    height: 10px;
+    margin: 0px;
+}
+QScrollBar::handle:horizontal {
+    background: #2A303C;
+    min-width: 30px;
+    border-radius: 5px;
+}
+QScrollBar::handle:horizontal:hover {
+    background: #00E5FF;
+}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    border: none;
+    background: none;
+    width: 0px;
+}
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+    background: none;
+}
+/* =========================================
+   --- CONTEXT MENU ---
+   ========================================= */
+QMenu {
+    background-color: #1A1F2B;
+    color: #E2E8F0;
+    border: 1px solid #2A303C;
+    border-radius: 6px;
+    padding: 6px;
+}
+QMenu::item {
+    padding: 8px 24px 8px 12px;
+    border-radius: 4px;
+}
+QMenu::item:selected {
+    background-color: #00E5FF;
+    color: #000000;
+}
+
+/* =========================================
+   --- ALBUM DETAILS VIEW ---
+   ========================================= */
+#backBtn {
+    background-color: #1A1F2B;
+    color: #94A3B8;
+    border-radius: 16px;
+    font-size: 18px;
+    font-weight: bold;
+    border: 1px solid #2A303C;
+}
+#backBtn:hover {
+    background-color: #00E5FF;
+    color: #000000;
+}
+
+#adArt {
+    background-color: #1A1F2B;
+    border-radius: 12px;
+    border: 1px solid #2A303C;
+}
+
+#adTitle {
+    font-size: 36px;
+    font-weight: 900;
+    color: #FFFFFF;
+    background: transparent;
+}
+
+#adArtist {
+    font-size: 18px;
+    font-weight: bold;
+    color: #E2E8F0;
+    background: transparent;
+    margin-top: 4px;
+}
+
+#adMeta {
+    font-size: 14px;
+    color: #94A3B8;
+    background: transparent;
+    margin-top: 4px;
+}
+
+#adPlayBtn {
+    background-color: #00E5FF;
+    color: #000000;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 10px 20px;
+    border: none;
+}
+#adPlayBtn:hover {
+    background-color: #66F0FF;
+}
+
+
+/* =========================================
+   --- ARTIST DETAILS VIEW ---
+   ========================================= */
+#artImage {
+    background-color: #1A1F2B;
+    border-radius: 150px;
+    border: 1px solid #2A303C;
+}
+
+#artName {
+    font-size: 38px;
+    font-weight: 900;
+    color: #FFFFFF;
+    background: transparent;
+    margin-top: 5px;
+}
+
+#artBio {
+    font-size: 13px;
+    color: #94A3B8;
+    background: transparent;
+}
+
+/* =========================================
+   --- LIKES & PLAYLISTS ---
+   ========================================= */
+#likeBtn {
+    background: transparent;
+    border: none;
+    color: #94A3B8;
+    font-size: 20px;
+    padding: 5px;
+    margin-left: 10px;
+}
+#likeBtn:hover {
+    color: #FFFFFF;
+}
+
+#playlistLabel {
+    color: #64748B;
+    font-size: 11px;
+    font-weight: bold;
+    margin-top: 15px;
+    margin-bottom: 5px;
+    margin-left: 10px;
+    background: transparent;
+}
+
+#sidebarPlaylists {
+    background: transparent;
+    border: none;
+    outline: none;
+}
+#sidebarPlaylists::item {
+    padding: 8px 15px;
+    color: #94A3B8;
+    border-radius: 4px;
+    font-size: 13px;
+}
+#sidebarPlaylists::item:hover {
+    background-color: #1A1F2B;
+    color: #FFFFFF;
+}
+#sidebarPlaylists::item:selected {
+    background-color: #0F2A3F;
+    color: #00E5FF;
+}
+
+/* Playlist Details Header */
+#pdHeader {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1A1F2B, stop:1 #12151C);
+    border-radius: 10px;
+    border: 1px solid #2A303C;
+}
+
+#pdIcon {
+    font-size: 60px;
+    color: #FFFFFF;
+    border-radius: 10px;
+}
+
+#pdType {
+    color: #94A3B8;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    background: transparent;
+}
+
+#pdTitle {
+    font-size: 36px; 
+    font-weight: 900;
+    color: #FFFFFF;
+    background: transparent;
+}
+
+#pdMeta {
+    color: #94A3B8;
+    font-size: 13px;
+    background: transparent;
+}
+
+/* =========================================
+   --- SETTINGS DIALOG ---
+   ========================================= */
+#settingsDialog {
+    background-color: #12151C;
+}
+
+#dialogTitle {
+    font-size: 22px;
+    font-weight: bold;
+    color: #FFFFFF;
+    background: transparent;
+}
+
+#inputLabel {
+    color: #94A3B8;
+    font-size: 12px;
+    font-weight: bold;
+    background: transparent;
+    margin-top: 5px;
+}
+
+#settingsDialog QLineEdit {
+    background-color: #1A1F2B;
+    color: #FFFFFF;
+    border: 2px solid #1F2430;
+    border-radius: 8px;
+    padding-left: 12px; 
+    font-size: 14px;
+}
+
+#settingsDialog QLineEdit:focus {
+    border: 2px solid #00E5FF; 
+}
+
+#dialogCancelBtn {
+    background-color: transparent;
+    color: #94A3B8;
+    border: 2px solid #2A303C;
+    border-radius: 8px;
+    padding: 0 16px;
+    font-weight: bold;
+}
+
+#dialogCancelBtn:hover {
+    background-color: #1A1F2B;
+    color: #FFFFFF;
+    border-color: #1F2430;
+}
+
+#dialogSaveBtn {
+    background-color: #00E5FF;
+    color: #000000;
+    border: none;
+    border-radius: 8px;
+    padding: 0 20px;
+    font-weight: bold;
+}
+
+#dialogSaveBtn:hover {
+    background-color: #66F0FF;
+}
+
+/* =========================================
+   --- LYRICS OVERLAY ---
+   ========================================= */
+#lyricsOverlay {
+    background: qlineargradient(x1:0, y1:0.9, x2:0, y2:1, stop:0 #090C10, stop:1 #05070A);
+}
+
+#lyricsText {
+    color: #64748B;
+    font-size: 22px;
+    font-weight: bold;
+    background: transparent;
+    padding: 10px;
+}
+
+/* The Active Highlight (Note: This works if Python removes its inline styles) */
+#lyricsText[style*="00E5FF"] {
+    color: #00E5FF;
+    font-size: 28px;
+    font-weight: 900;
+    /* Glowing Neon Depth */
+    text-shadow: 0px 0px 15px rgba(0, 229, 255, 0.8), 0px 0px 30px rgba(0, 229, 255, 0.4);
+}
