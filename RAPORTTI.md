@@ -89,3 +89,17 @@ Miten mittaan projektin onnistumista?
 - Koodi on jaettu moduuleihin (ei yhtään tiedostoa yli 500 riviä)
 - README ja käyttöohje ovat olemassa
 
+
+### 2.11.2026
+
+Siistetty bugeja, luettu koodia läpi tarkemmin ja dokumentointia.
+
+### 3.11.2026
+
+Lisätty Kirjaudu ulos "Log Out" ominaisuus, käyttäjä voi halutessaan vaihtaa IP osoitetta yms.
+
+### 4.11.2026 
+
+Aloitin puhtaalta pöydältä, viimeiset 5 päivää lisäsin muutamia ominaisuuksia, mutta sekoitin, niin paljon sovellusta, että oli pakko palata Gitin avulla takaisin.
+
+Luen nyt koodin kunnolla läpi ja pidän pienen tauon koodaamisesta ja mietin mikä on tärkeää tälle sovellukselle.

@@ -1126,20 +1126,16 @@ class MainWindow(QMainWindow):
             event.accept()
 
     def animate_click(self, widget):
-        anim = QPropertyAnimation(widget, b"geometry")
-        anim.setDuration(150)
-        anim.setEasingCurve(QEasingCurve.OutQuad)
+        """Tehdään varma klikkaus-efekti muuttamalla widgetin tyyliä hetkellisesti."""
+        # Otetaan talteen widgetin alkuperäinen tyyli
+        alkuperainen_tyyli = widget.styleSheet()
         
-        rect = widget.geometry()
-        shrunk_rect = rect.adjusted(4, 4, -4, -4) 
+        # Asetetaan klikkaustyyli (esim. haalistetaan taustaa tai lisätään harmaa vivahde)
+        widget.setStyleSheet(alkuperainen_tyyli + "; background-color: rgba(255, 255, 255, 0.15);")
         
-        anim.setStartValue(rect)
-        anim.setKeyValueAt(0.5, shrunk_rect)
-        anim.setEndValue(rect)
-        
-        self.album_animations.append(anim) 
-        anim.start()
-        anim.finished.connect(lambda: self.album_animations.remove(anim) if anim in self.album_animations else None)
+        # Luodaan pikavauhtia ajastin, joka palauttaa alkuperäisen tyylin 120 millisekunnin (0.12s) päästä
+        QTimer.singleShot(120, lambda: widget.setStyleSheet(alkuperainen_tyyli))
+
 
     def open_album_details(self, album):
         self.switch_view(5)
@@ -1435,3 +1431,25 @@ class MainWindow(QMainWindow):
 
     def update_play_buttons(self, state):
         self.btn_play.setText("❚❚" if state == QMediaPlayer.PlayingState else "▶")
+
+
+    def animate_album_click(self, widget):
+        """Tehdään albumi-widgetille lyhyt ja pehmeä klikkaus-vilahdus."""
+        efekti = widget.graphicsEffect()
+        if not isinstance(efekti, QGraphicsOpacityEffect):
+            efekti = QGraphicsOpacityEffect(widget)
+            widget.setGraphicsEffect(efekti)
+            
+        animaatio = QPropertyAnimation(efekti, b"opacity")
+        animaatio.setDuration(180) # Kesto 0.18 sekuntia
+        
+        animaatio.setKeyValueAt(0.0, 1.0)
+        animaatio.setKeyValueAt(0.4, 0.4)
+        animaatio.setKeyValueAt(1.0, 1.0)
+        
+        animaatio.setEasingCurve(QEasingCurve.InOutQuad)
+        
+        self.album_animations.append(animaatio)
+        animaatio.finished.connect(lambda: self.album_animations.remove(animaatio) if animaatio in self.album_animations else None)
+        
+        animaatio.start()
