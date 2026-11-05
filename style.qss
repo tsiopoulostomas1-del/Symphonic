@@ -401,13 +401,14 @@ QMenu::item:selected {
     font-weight: 900;
     color: #FFFFFF;
     background: transparent;
-    margin-top: 5px;
+    margin-top: 50px;
 }
 
 #artBio {
-    font-size: 13px;
+    font-size: 14px;
     color: #94A3B8;
     background: transparent;
+    width: 400px;
 }
 
 /* =========================================
