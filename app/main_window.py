@@ -475,7 +475,7 @@ class MainWindow(QMainWindow):
         self.btn_like.clicked.connect(self.toggle_like_current_song)
         left_layout.addWidget(self.btn_like)
         
-        self.btn_lyrics = QPushButton("🎤")
+        self.btn_lyrics = QPushButton("🎙️")
         self.btn_lyrics.setObjectName("likeBtn") 
         self.btn_lyrics.setCursor(Qt.PointingHandCursor)
         self.btn_lyrics.clicked.connect(self.toggle_lyrics_view)
@@ -493,11 +493,11 @@ class MainWindow(QMainWindow):
         controls_layout.setSpacing(20)
         controls_layout.setAlignment(Qt.AlignCenter)
         
-        self.btn_shuffle = QPushButton("SHFL")
-        self.btn_prev = QPushButton("◄◄")
+        self.btn_shuffle = QPushButton("⤨")
+        self.btn_prev = QPushButton("◀◀")
         self.btn_play = QPushButton("▶")
-        self.btn_next = QPushButton("►►")
-        self.btn_repeat = QPushButton("RPT")
+        self.btn_next = QPushButton("▶▶")
+        self.btn_repeat = QPushButton("⟲ / RPT")
         
         for btn in [self.btn_shuffle, self.btn_prev, self.btn_play, self.btn_next, self.btn_repeat]:
             btn.setCursor(Qt.PointingHandCursor)

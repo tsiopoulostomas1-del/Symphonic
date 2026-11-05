@@ -86,14 +86,15 @@ QHeaderView::section {
 /* --- Search --- */
 #searchInput {
     background-color: #1A1F2B;
-    border: 2px solid #1F2430;
-    border-radius: 16px;
+    border: 1px solid #1F2430;
+    border-radius: 8px;
     padding: 8px 15px;
     font-size: 14px;
     color: #FFFFFF;
+
 }
 #searchInput:focus {
-    border: 2px solid #00E5FF;
+    border: 2px solid #ffffff;
 }
 
 #contentStack {
@@ -115,7 +116,7 @@ QHeaderView::section {
 
 #albumArt {
     background-color: transparent;
-    border-radius: 6px;
+    border-radius: 8px;
 }
 
 #npTitle {
@@ -260,12 +261,12 @@ QScrollBar::handle:vertical {
 
 /* When you hover over the handle, it glows cyan */
 QScrollBar::handle:vertical:hover {
-    background: #00E5FF; 
+    background: #ffffff; 
 }
 
 /* When you are actively dragging it */
 QScrollBar::handle:vertical:pressed {
-    background: #66F0FF; 
+    background: #b4b4b4; 
 }
 
 /* Hide the ugly up/down arrows */

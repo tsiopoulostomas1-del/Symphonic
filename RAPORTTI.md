@@ -103,3 +103,8 @@ Lisätty Kirjaudu ulos "Log Out" ominaisuus, käyttäjä voi halutessaan vaihtaa
 Aloitin puhtaalta pöydältä, viimeiset 5 päivää lisäsin muutamia ominaisuuksia, mutta sekoitin, niin paljon sovellusta, että oli pakko palata Gitin avulla takaisin.
 
 Luen nyt koodin kunnolla läpi ja pidän pienen tauon koodaamisesta ja mietin mikä on tärkeää tälle sovellukselle.
+
+### 5.11.2026
+
+Muutettu sovelluksen tyyliä hieman, lisätty scroll viivaan valkoista väriä, muutettu painikkeiden emojia ja hover / pääväriä paremmaksi. 
+Muutama emoji vaihdettu minimaalisemmaksi. Vähennetty border-radius Scroll baarista, lisätty border-radius joihinkin nappeihin.
