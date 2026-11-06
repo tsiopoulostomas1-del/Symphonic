@@ -14,6 +14,7 @@ vaihtoehto olemassa oleville Subsonic-asiakkaille.
 - Synkronoidut lyriikat LRCLIB:stä
 - Tykkäykset, soittolistat
 - Scrobblaus Navidromelle
+- Windowsissa palvelimen salasana suojataan Windows DPAPI:lla; vanhat asetukset muunnetaan automaattisesti.
 
 ## Teknologia
 

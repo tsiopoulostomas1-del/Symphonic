@@ -108,3 +108,15 @@ Luen nyt koodin kunnolla läpi ja pidän pienen tauon koodaamisesta ja mietin mi
 
 Muutettu sovelluksen tyyliä hieman, lisätty scroll viivaan valkoista väriä, muutettu painikkeiden emojia ja hover / pääväriä paremmaksi. 
 Muutama emoji vaihdettu minimaalisemmaksi. Vähennetty border-radius Scroll baarista, lisätty border-radius joihinkin nappeihin.
+
+### 6.11.2026
+
+Korjattu isohkoja bugeja main_window.py, services, settings, subsonic yms.
+
+- Kappaleet ja albumit latautuvat nyt 500 sivun välein, joten kirjastot voivat ylittää vanhat 5 000 kappaleen/500 albumin rajoitukset.
+
+- Käynnistyskirjaston lataus, sanoitusten haku ja scrobble-toisto tapahtuvat nyt taustalla. Scrobble-toistot lähetetään riittävän todellisen toistoajan jälkeen. Eteenpäin kelaaminen ei laukaise niitä.
+
+- Sanoitusten vara-URL-osoitteet koodaavat artistin ja kappaleen nimet oikein.
+
+- Windowsissa tallennetut salasanat on suojattu DPAPI:lla.

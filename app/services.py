@@ -10,6 +10,7 @@ external services without touching the window code.
 
 import re
 import requests
+from urllib.parse import quote
 from PySide6.QtWidgets import QLabel
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFontMetrics
@@ -114,7 +115,10 @@ def fetch_lyrics_from_lyrics_ovh(track_title: str, artist_name: str) -> str:
     Returns the lyrics as a single string, or an empty string on failure.
     """
     try:
-        url = LYRICS_OVH_URL.format(artist=artist_name, title=track_title)
+        url = LYRICS_OVH_URL.format(
+            artist=quote(artist_name, safe=""),
+            title=quote(track_title, safe=""),
+        )
         response = requests.get(url, timeout=10)
         if response.status_code != 200:
             return ""

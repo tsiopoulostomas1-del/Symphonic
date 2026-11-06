@@ -95,6 +95,12 @@ class SettingsDialog(QDialog):
             save_settings(url, user, pwd)
             self.accept()
         else:
-            QMessageBox.critical(self, "Connection Failed", "Could not connect to the server.\nCheck the URL, username, and password.")
+            QMessageBox.critical(
+                self,
+                "Connection Failed",
+                "Could not connect to the server.\n"
+                f"{client.ping_error}\n\n"
+                "Check the URL, username, password, and server availability.",
+            )
             self.btn_save.setText("Save & Connect")
             self.btn_save.setEnabled(True)

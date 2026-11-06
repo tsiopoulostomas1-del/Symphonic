@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import (
     Qt, QUrl, QSize, QTime, QPropertyAnimation, QEasingCurve, 
-    QTimer, QEvent, QRect
+    QTimer, QEvent, QRect, QThread, Signal, Slot
 )
 from PySide6.QtGui import QPixmap, QIcon, QColor, QPainter, QPainterPath, QFontMetrics
 from PySide6.QtMultimedia import QMediaPlayer
@@ -19,9 +19,10 @@ from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkRe
 from app.player import Player
 from app.subsonic import SubsonicClient
 from app.settings import load_settings
+from app.services import fetch_lyrics_from_lrclib, fetch_lyrics_from_lyrics_ovh
 from app.widgets.settings_dialog import SettingsDialog
 
-LASTFM_API_KEY = "6e7807c08e2b0515d717009115b12d42" 
+LASTFM_API_KEY = "6e7807c08e2b0515d717009115b12d42"
 
 class LyricLabel(QLabel):
     def __init__(self, text, parent=None):
@@ -36,6 +37,71 @@ class LyricLabel(QLabel):
         rect = metrics.boundingRect(0, 0, self.width() - 10, 10000, Qt.TextWordWrap, self.text())
         self.setMinimumHeight(rect.height() + 20)
 
+
+class LibraryLoader(QThread):
+    loaded = Signal(int, object, object)
+    failed = Signal(int, object, str)
+    progress = Signal(int, str)
+
+    def __init__(self, request_id, client):
+        super().__init__()
+        self.request_id = request_id
+        self.client = client
+
+    def run(self):
+        try:
+            self.progress.emit(self.request_id, "Checking server...")
+            if not self.client.ping():
+                raise ConnectionError(
+                    self.client.ping_error or "Could not connect to the Navidrome server."
+                )
+            self.progress.emit(self.request_id, "Loading songs...")
+            songs = self.client.get_all_songs()
+            self.progress.emit(self.request_id, "Loading artists...")
+            artists = self.client.get_artists()
+            self.progress.emit(self.request_id, "Loading albums...")
+            albums = self.client.get_albums()
+            self.progress.emit(self.request_id, "Loading playlists...")
+            playlists = self.client.get_playlists()
+            data = {
+                "songs": songs,
+                "artists": artists,
+                "albums": albums,
+                "playlists": playlists,
+            }
+            self.loaded.emit(self.request_id, self.client, data)
+        except Exception as exc:
+            self.failed.emit(self.request_id, self.client, str(exc))
+
+
+class LyricsLoader(QThread):
+    loaded = Signal(int, object)
+
+    def __init__(self, request_id, title, artist):
+        super().__init__()
+        self.request_id = request_id
+        self.title = title
+        self.artist = artist
+
+    def run(self):
+        result = fetch_lyrics_from_lrclib(self.title, self.artist)
+        synced = result.get("syncedLyrics", "")
+        plain = result.get("plainLyrics", "")
+        if not synced and not plain:
+            plain = fetch_lyrics_from_lyrics_ovh(self.title, self.artist)
+        self.loaded.emit(self.request_id, {"synced": synced, "plain": plain})
+
+
+class ScrobbleWorker(QThread):
+    def __init__(self, client, song_id):
+        super().__init__()
+        self.client = client
+        self.song_id = song_id
+
+    def run(self):
+        self.client.scrobble(self.song_id)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -46,8 +112,14 @@ class MainWindow(QMainWindow):
         
         self.settings = load_settings()
         self.client = None
+        self.background_workers = []
+        self.library_load_id = 0
+        self.lyrics_request_id = 0
         self.songs_data = []
         self.current_song_id = None
+        self.scrobbled_song_id = None
+        self.last_playback_position = None
+        self.listened_ms = 0
         self.current_artist_name = None
         self.album_animations = []
         
@@ -178,6 +250,9 @@ class MainWindow(QMainWindow):
         self.search_input.setFixedWidth(300)
         self.search_input.returnPressed.connect(self.perform_search)
         top_bar.addWidget(self.search_input)
+        self.library_status = QLabel("")
+        self.library_status.setObjectName("libraryStatus")
+        top_bar.insertWidget(top_bar.count() - 1, self.library_status)
         
         content_layout.addLayout(top_bar)
 
@@ -426,6 +501,7 @@ class MainWindow(QMainWindow):
         self.content_stack.addWidget(self.album_details_widget) # 5
         self.content_stack.addWidget(self.artist_details_widget) # 6
         self.content_stack.addWidget(self.playlist_details_widget) # 7
+        self.content_stack.setCurrentIndex(2)
         
         content_layout.addWidget(self.content_stack)
         top_layout.addWidget(self.main_content_widget)
@@ -799,6 +875,13 @@ class MainWindow(QMainWindow):
                     break
 
     def open_liked_songs(self):
+        if not self.client:
+            QMessageBox.information(
+                self, "Not Connected", "Connect to your Navidrome server in Settings first."
+            )
+            self.open_settings()
+            return
+
         self.switch_view(7)
         self.pd_type.setText("COLLECTION")
         self.pd_title.setText("Liked Songs")
@@ -809,6 +892,9 @@ class MainWindow(QMainWindow):
         self.load_liked_songs()
 
     def load_liked_songs(self):
+        if not self.client:
+            return
+
         self.liked_songs_data = self.client.get_starred_songs()
         self.pd_meta.setText(f"{len(self.liked_songs_data)} songs")
         
@@ -823,6 +909,13 @@ class MainWindow(QMainWindow):
             self.pd_table.setItem(row, 3, QTableWidgetItem(dur_str))
 
     def on_playlist_clicked(self, item):
+        if not self.client:
+            QMessageBox.information(
+                self, "Not Connected", "Connect to your Navidrome server in Settings first."
+            )
+            self.open_settings()
+            return
+
         playlist_id = item.data(Qt.UserRole)
         playlist_name = item.text()
         
@@ -907,7 +1000,9 @@ class MainWindow(QMainWindow):
     def fetch_lyrics(self, title, artist):
         for i in reversed(range(self.lyrics_container_layout.count())): 
             widget = self.lyrics_container_layout.itemAt(i).widget()
-            if widget: widget.setParent(None)
+            if widget:
+                widget.setParent(None)
+                widget.deleteLater()
             
         self.lyrics_lines = []
         self.lyric_labels = []
@@ -917,61 +1012,37 @@ class MainWindow(QMainWindow):
         loading_lbl.setObjectName("lyricsText")
         loading_lbl.setStyleSheet("color: #94A3B8; font-size: 24px;")
         self.lyrics_container_layout.addWidget(loading_lbl)
-        
-        try:
-            url = "https://lrclib.net/api/search"
-            headers = {"User-Agent": "SymphonicDesktop/1.0 (https://github.com/yourusername/symphonic)"}
-            params = {"track_name": title, "artist_name": artist}
-            
-            r = requests.get(url, params=params, headers=headers, timeout=10)
-            
-            if r.status_code == 200:
-                data = r.json()
-                if data and len(data) > 0:
-                    best_match = data[0]
-                    synced_lyrics = best_match.get("syncedLyrics")
-                    plain_lyrics = best_match.get("plainLyrics")
-                    
-                    loading_lbl.setParent(None)
-                    
-                    if synced_lyrics:
-                        self.parse_lrc(synced_lyrics)
-                        return
-                    elif plain_lyrics:
-                        for line in plain_lyrics.split('\n'):
-                            if not line.strip(): continue
-                            lbl = LyricLabel(line)
-                            self.lyrics_container_layout.addWidget(lbl)
-                        return
-        except Exception as e:
-            print(f"LRCLIB Error: {e}")
 
-        try:
-            loading_lbl.setText("Searching backup sources...")
-            fallback_url = f"https://api.lyrics.ovh/v1/{artist}/{title}"
-            r2 = requests.get(fallback_url, timeout=10)
-            loading_lbl.setParent(None)
-            
-            if r2.status_code == 200:
-                data2 = r2.json()
-                plain_lyrics = data2.get("lyrics", "")
-                
-                if plain_lyrics:
-                    for line in plain_lyrics.split('\n'):
-                        if not line.strip(): continue
-                        lbl = LyricLabel(line)
-                        self.lyrics_container_layout.addWidget(lbl)
-                    return
-            
-            no_lbl = QLabel("Lyrics currently unavailable. Please try again later.")
-            no_lbl.setObjectName("lyricsText")
-            no_lbl.setStyleSheet("color: #94A3B8; font-size: 20px;")
-            self.lyrics_container_layout.addWidget(no_lbl)
-            
-        except Exception as e:
-            loading_lbl.setText("Lyrics currently unavailable. Please try again later.")
-            loading_lbl.setStyleSheet("color: #94A3B8; font-size: 20px;")
-            print(f"Fallback Lyrics Error: {e}")
+        self.lyrics_request_id += 1
+        worker = LyricsLoader(self.lyrics_request_id, title, artist)
+        worker.loaded.connect(self.on_lyrics_loaded)
+        self.keep_background_worker(worker)
+        worker.start()
+
+    @Slot(int, object)
+    def on_lyrics_loaded(self, request_id, result):
+        if request_id != self.lyrics_request_id:
+            return
+
+        for i in reversed(range(self.lyrics_container_layout.count())):
+            widget = self.lyrics_container_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+                widget.deleteLater()
+
+        synced_lyrics = result["synced"]
+        plain_lyrics = result["plain"]
+        if synced_lyrics:
+            self.parse_lrc(synced_lyrics)
+        elif plain_lyrics:
+            for line in plain_lyrics.split("\n"):
+                if line.strip():
+                    self.lyrics_container_layout.addWidget(LyricLabel(line))
+        else:
+            no_lyrics = QLabel("Lyrics currently unavailable. Please try again later.")
+            no_lyrics.setObjectName("lyricsText")
+            no_lyrics.setStyleSheet("color: #94A3B8; font-size: 20px;")
+            self.lyrics_container_layout.addWidget(no_lyrics)
 
     def parse_lrc(self, lrc_text):
         lines = lrc_text.split('\n')
@@ -1057,33 +1128,90 @@ class MainWindow(QMainWindow):
         if not self.client:
             self.open_settings()
             return
-        if not self.client.ping():
-            self.songs_table.setRowCount(0)
+
+        self.library_load_id += 1
+        load_id = self.library_load_id
+        client = self.client
+        worker = LibraryLoader(load_id, client)
+        worker.loaded.connect(self.on_library_loaded)
+        worker.failed.connect(self.on_library_load_failed)
+        worker.progress.connect(self.on_library_load_progress)
+        self.library_status.setText("Connecting...")
+        self.keep_background_worker(worker)
+        worker.start()
+
+    def keep_background_worker(self, worker):
+        self.background_workers.append(worker)
+        worker.finished.connect(self.on_background_worker_finished)
+
+    @Slot()
+    def on_background_worker_finished(self):
+        worker = self.sender()
+        if worker in self.background_workers:
+            self.background_workers.remove(worker)
+
+    @Slot(int, object, object)
+    def on_library_loaded(self, request_id, client, data):
+        if request_id != self.library_load_id or client is not self.client:
             return
 
-        self.songs_data = self.client.get_all_songs()
+        self.songs_data = data["songs"]
         self.populate_songs_table(self.songs_data)
 
         self.artists_list.clear()
-        for artist in self.client.get_artists():
+        for artist in data["artists"]:
             item = QListWidgetItem(artist.get("name", "Unknown"))
             item.setData(Qt.UserRole, artist.get("id"))
             self.artists_list.addItem(item)
 
+        for i in reversed(range(self.albums_grid.count())):
+            widget = self.albums_grid.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+
         row, col = 0, 0
-        for album in self.client.get_albums():
+        for album in data["albums"]:
             self.add_album_card(album, self.albums_grid, row, col)
             col += 1
             if col > 4:
                 col = 0
                 row += 1
                 
-        self.current_playlists = self.client.get_playlists()
+        self.current_playlists = data["playlists"]
         self.playlists_list.clear()
         for p in self.current_playlists:
             item = QListWidgetItem(p["name"])
             item.setData(Qt.UserRole, p["id"])
             self.playlists_list.addItem(item)
+
+        song_count = len(data["songs"])
+        artist_count = len(data["artists"])
+        album_count = len(data["albums"])
+        self.library_status.setText(
+            f"Loaded {song_count} songs, {artist_count} artists, {album_count} albums"
+        )
+        if not song_count and not artist_count and not album_count:
+            QMessageBox.information(
+                self,
+                "Library Is Empty",
+                "The server connected successfully but returned no songs, artists, "
+                "or albums. Check that the library is scanned and that this account "
+                "has permission to access it.",
+            )
+
+    @Slot(int, str)
+    def on_library_load_progress(self, request_id, message):
+        if request_id == self.library_load_id:
+            self.library_status.setText(message)
+
+    @Slot(int, object, str)
+    def on_library_load_failed(self, request_id, client, message):
+        if request_id != self.library_load_id or client is not self.client:
+            return
+        self.songs_data = []
+        self.songs_table.setRowCount(0)
+        self.library_status.setText("Library load failed")
+        QMessageBox.warning(self, "Library Load Failed", message)
 
     def add_album_card(self, album, grid, row, col):
         card = QWidget()
@@ -1348,6 +1476,9 @@ class MainWindow(QMainWindow):
 
     def on_track_changed(self, song):
         self.current_song_id = song["id"]
+        self.scrobbled_song_id = None
+        self.last_playback_position = None
+        self.listened_ms = 0
         self.current_artist_name = song.get("artist", "Unknown")
         
         self.np_title.setText(song.get("title", "Unknown"))
@@ -1369,8 +1500,6 @@ class MainWindow(QMainWindow):
         if self.lyrics_overlay.isVisible():
             self.fetch_lyrics(song.get("title", ""), song.get("artist", ""))
 
-        self.client.scrobble(song["id"])
-        
         self.populate_songs_table(self.songs_data)
         if self.content_stack.currentIndex() == 3:
             self.populate_queue_table()
@@ -1418,12 +1547,37 @@ class MainWindow(QMainWindow):
         reply.deleteLater()
 
     def update_seek_bars(self, position):
+        self.maybe_scrobble_track(position)
+
         if not self.seek_bar.isSliderDown(): 
             self.seek_bar.setValue(position)
             self.time_current.setText(QTime(0, 0).addMSecs(position).toString("m:ss"))
             
         if not self.big_seek.isSliderDown(): 
             self.big_seek.setValue(position)
+
+    def maybe_scrobble_track(self, position):
+        if not self.current_song_id or self.current_song_id == self.scrobbled_song_id:
+            return
+
+        previous_position = self.last_playback_position
+        self.last_playback_position = position
+        if (
+            previous_position is not None
+            and self.player.media_player.playbackState() == QMediaPlayer.PlayingState
+        ):
+            played_delta = position - previous_position
+            if 0 < played_delta <= 3000:
+                self.listened_ms += played_delta
+
+        duration = self.player.media_player.duration()
+        if duration <= 0 or self.listened_ms < min(duration // 2, 4 * 60 * 1000):
+            return
+
+        self.scrobbled_song_id = self.current_song_id
+        worker = ScrobbleWorker(self.client, self.current_song_id)
+        self.keep_background_worker(worker)
+        worker.start()
 
     def set_seek_bar_ranges(self, duration):
         self.seek_bar.setRange(0, duration)
