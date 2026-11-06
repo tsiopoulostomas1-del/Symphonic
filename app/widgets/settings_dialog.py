@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-    QLineEdit, QPushButton, QMessageBox
+    QLineEdit, QPushButton, QMessageBox, QGraphicsOpacityEffect,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QPropertyAnimation, QTimer, QEasingCurve
 from app.settings import save_settings
 from app.subsonic import SubsonicClient
 
@@ -17,9 +17,37 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(15)
 
-        title = QLabel("Connect to Navidrome")
-        title.setObjectName("dialogTitle")
-        layout.addWidget(title)
+        self.title_messages = [
+            "Connect to Navidrome",
+            "Discover your music",
+            "Stream your favorite tracks",
+            "Symphonize your day!",
+        ]
+        self.title_index = 0
+        self.title_label = QLabel(self.title_messages[self.title_index])
+        self.title_label.setObjectName("dialogTitle")
+        self.title_label.setMinimumHeight(30)
+        self.title_opacity = QGraphicsOpacityEffect(self.title_label)
+        self.title_label.setGraphicsEffect(self.title_opacity)
+        layout.addWidget(self.title_label)
+
+        self.title_animation = QPropertyAnimation(
+            self.title_opacity, b"opacity", self
+        )
+        self.title_animation.setDuration(320)
+        self.title_animation.setEasingCurve(QEasingCurve.InOutCubic)
+        self.title_animation.setKeyValueAt(0.0, 1.0)
+        self.title_animation.setKeyValueAt(0.45, 0.0)
+        self.title_animation.setKeyValueAt(0.55, 0.0)
+        self.title_animation.setKeyValueAt(1.0, 1.0)
+        self.title_change_timer = QTimer(self)
+        self.title_change_timer.setSingleShot(True)
+        self.title_change_timer.timeout.connect(self.show_next_title)
+        self.title_animation.finished.connect(self.schedule_next_title)
+        self.title_cycle_timer = QTimer(self)
+        self.title_cycle_timer.setInterval(2500)
+        self.title_cycle_timer.timeout.connect(self.rotate_title)
+        self.title_cycle_timer.start()
         layout.addSpacing(10)
 
         # Server URL
@@ -77,6 +105,19 @@ class SettingsDialog(QDialog):
         btn_layout.addWidget(self.btn_save)
         
         layout.addLayout(btn_layout)
+
+    def rotate_title(self):
+        if self.title_animation.state() == QPropertyAnimation.Running:
+            return
+        self.title_change_timer.start(self.title_animation.duration() // 2)
+        self.title_animation.start()
+
+    def show_next_title(self):
+        self.title_index = (self.title_index + 1) % len(self.title_messages)
+        self.title_label.setText(self.title_messages[self.title_index])
+
+    def schedule_next_title(self):
+        self.title_change_timer.stop()
 
     def validate_and_save(self):
         url = self.server_input.text().strip()

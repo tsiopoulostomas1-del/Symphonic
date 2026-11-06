@@ -128,3 +128,7 @@ Korjattu isohkoja bugeja main_window.py, services, settings, subsonic yms.
         - Lisätty pieni minimaalinen napautus animaatio kun painaa jotain albumia.
 
         - Lisätty ominaisuus jolla säästetään internettiä, jos sovellus lataa albumien kuvat, se ei lataa niitä uudestaan verkosta, vaan tiedostosta.
+
+    OSA 3
+
+        - Lisätty muutama teksti Log In / Settings osioon, aina 2.5 sekunnin jälkeen vaihtuu teksti toiseen pienellä fade in animaatiolla.
