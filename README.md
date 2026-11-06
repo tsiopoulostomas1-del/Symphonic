@@ -14,6 +14,10 @@ vaihtoehto olemassa oleville Subsonic-asiakkaille.
 - Synkronoidut lyriikat LRCLIB:stä
 - Tykkäykset, soittolistat
 - Scrobblaus Navidromelle
+- Albumikuvien paikallinen välimuisti vähentää toistuvia latauksia.
+- Viimeksi kuunnellut kappaleet ja kuuntelukohdan palautus.
+- Kirjaston latauksen edistymisnäyttö ja uudelleenyritys yhteysvirheissä.
+- Viimeksi käytetty päänäkymä palautetaan sovelluksen käynnistyessä.
 - Windowsissa palvelimen salasana suojataan Windows DPAPI:lla; vanhat asetukset muunnetaan automaattisesti.
 
 ## Teknologia

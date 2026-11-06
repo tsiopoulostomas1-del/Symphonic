@@ -39,6 +39,17 @@ QWidget {
     background-color: #12151C;
 }
 
+#libraryProgress {
+    border: 1px solid #2A303C;
+    border-radius: 3px;
+    background-color: #1A1F2B;
+}
+
+#libraryProgress::chunk {
+    background-color: #00E5FF;
+    border-radius: 3px;
+}
+
 #pageTitle {
     font-size: 28px;
     font-weight: bold;

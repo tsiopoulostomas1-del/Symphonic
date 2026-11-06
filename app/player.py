@@ -24,6 +24,7 @@ class Player(QObject):
         self.current_index = -1
         self.is_shuffle = False
         self.is_repeat = False
+        self.pending_position = 0
         
         self.audio_output.setVolume(0.5)
 
@@ -52,10 +53,11 @@ class Player(QObject):
             # Add to the absolute end of the queue
             self.queue.append(item)
 
-    def play_index(self, index: int):
+    def play_index(self, index: int, start_position: int = 0):
         if 0 <= index < len(self.queue):
             self.current_index = index
             item = self.queue[index]
+            self.pending_position = max(0, start_position)
             self.media_player.setSource(QUrl(item["url"]))
             self.media_player.play()
             self.track_changed.emit(item["song_data"])
@@ -100,6 +102,13 @@ class Player(QObject):
             self.play_index(len(self.queue) - 1)
 
     def _on_media_status_changed(self, status):
+        if status in (
+            QMediaPlayer.LoadedMedia,
+            QMediaPlayer.BufferedMedia,
+        ) and self.pending_position:
+            self.media_player.setPosition(self.pending_position)
+            self.pending_position = 0
+
         if status == QMediaPlayer.EndOfMedia:
             if self.is_repeat and not self.is_shuffle:
                 self.media_player.setPosition(0)

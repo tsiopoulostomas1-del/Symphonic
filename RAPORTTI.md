@@ -120,3 +120,11 @@ Korjattu isohkoja bugeja main_window.py, services, settings, subsonic yms.
 - Sanoitusten vara-URL-osoitteet koodaavat artistin ja kappaleen nimet oikein.
 
 - Windowsissa tallennetut salasanat on suojattu DPAPI:lla.
+
+    OSA 2
+
+        - Jaettu main_window.py neljään tiedostoon jotta on helpompi kehittää ja ylläpitää sovellusta.
+
+        - Lisätty pieni minimaalinen napautus animaatio kun painaa jotain albumia.
+
+        - Lisätty ominaisuus jolla säästetään internettiä, jos sovellus lataa albumien kuvat, se ei lataa niitä uudestaan verkosta, vaan tiedostosta.
