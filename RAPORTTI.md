@@ -142,3 +142,11 @@ Korjattu sovelluksessa muutama error ja bugi jonka takia kirjasto kuten albumit 
 - Vaihdoin kappaleiden haun tyhjästä search3-haun kyselystä albumien kappalelistojen hakuun app/subsonic.py.
 
 - Lisäsin tarkemmat lataustilat ja virheilmoituksen, jos odotettu API-vastaus puuttuu, sekä tein tilatekstistä näkyvämmän app/window_ui.py.
+
+    OSA 4
+
+    - Haku ja artistitietojen lataus toimivat taustalla, joten ne eivät jumita käyttöliittymää.
+
+    - Hakutuloksen toisto käyttää valittua kappaletta suoraan eikä hae tuloksia uudelleen.
+
+    - Kun avaat sovelluksen, se skaalautuu Full Screen moodissa, eli sovellus ei ole pienennettynä ikkunana.

@@ -1,15 +1,61 @@
-import re
-import requests
-
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QListWidgetItem, QTableWidgetItem,
     QMenu, QInputDialog, QMessageBox,
 )
-from PySide6.QtCore import Qt, QTime
+from PySide6.QtCore import Qt, QTime, QThread, Signal, Slot
 from PySide6.QtCore import QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QPixmap, QColor, QPainter, QPainterPath
+from app.services import fetch_artist_bio_from_lastfm
+from app.subsonic import SubsonicClient
 
 LASTFM_API_KEY = "6e7807c08e2b0515d717009115b12d42"
+
+
+class ArtistDetailsLoader(QThread):
+    loaded = Signal(int, object, object, str)
+    failed = Signal(int, object, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        client: SubsonicClient,
+        artist_id: str,
+        artist_name: str,
+    ):
+        super().__init__()
+        self.request_id = request_id
+        self.client = client
+        self.artist_id = artist_id
+        self.artist_name = artist_name
+
+    def run(self):
+        try:
+            artist_info = self.client.get_artist_info(self.artist_id)
+        except Exception as exc:
+            self.failed.emit(self.request_id, self.artist_id, str(exc))
+            return
+
+        bio = fetch_artist_bio_from_lastfm(self.artist_name, LASTFM_API_KEY)
+        self.loaded.emit(self.request_id, self.artist_id, artist_info, bio)
+
+
+class SearchLoader(QThread):
+    loaded = Signal(int, str, object)
+    failed = Signal(int, str, str)
+
+    def __init__(self, request_id: int, client: SubsonicClient, query: str):
+        super().__init__()
+        self.request_id = request_id
+        self.client = client
+        self.query = query
+
+    def run(self):
+        try:
+            songs = self.client.search(self.query)
+        except Exception as exc:
+            self.failed.emit(self.request_id, self.query, str(exc))
+            return
+        self.loaded.emit(self.request_id, self.query, songs)
 
 
 class MainWindowLibrary:
@@ -169,13 +215,8 @@ class MainWindowLibrary:
         
         cover_id = album.get("coverArt")
         if cover_id:
-            self.load_cover_art(
-                cover_id,
-                300,
-                lambda data, label=img_label: self.on_album_art_downloaded(
-                    data, label
-                ),
-            )
+            img_label.setProperty("coverId", str(cover_id))
+            img_label.setProperty("artworkLoaded", False)
     def handle_album_click(self, event, album, card):
         if event.button() == Qt.LeftButton:
             self.animate_album_click(
@@ -257,36 +298,34 @@ class MainWindowLibrary:
         self.current_artist_id = artist_id
         self.current_artist_name = artist_name
         self.art_name.setText(artist_name)
-        self.art_bio.setText("Loading biography...")
+        self.art_bio.setText("Loading artist details...")
+        self.art_image.clear()
         
         for i in reversed(range(self.artist_albums_grid.count())): 
             widget = self.artist_albums_grid.itemAt(i).widget()
             if widget: widget.setParent(None)
 
-        artist_info = self.client.get_artist_info(artist_id)
-        
-        if LASTFM_API_KEY != "YOUR_API_KEY_HERE":
-            try:
-                params = {
-                    "method": "artist.getinfo",
-                    "artist": artist_name,
-                    "api_key": LASTFM_API_KEY,
-                    "format": "json"
-                }
-                r = requests.get("http://ws.audioscrobbler.com/2.0/", params=params, timeout=5)
-                data = r.json()
-                
-                if "artist" in data and "bio" in data["artist"]:
-                    bio_text = data["artist"]["bio"]["summary"]
-                    bio_text = re.sub('<[^<]+?>', '', bio_text)
-                    self.art_bio.setText(bio_text)
-                else:
-                    self.art_bio.setText("No biography available.")
-            except Exception as e:
-                self.art_bio.setText("Could not load biography.")
-        else:
-            self.art_bio.setText("Add your Last.fm API key in the code to see biographies.")
+        self.artist_details_request_id += 1
+        loader = ArtistDetailsLoader(
+            self.artist_details_request_id,
+            self.client,
+            artist_id,
+            artist_name,
+        )
+        loader.loaded.connect(self.on_artist_details_loaded)
+        loader.failed.connect(self.on_artist_details_failed)
+        self.keep_background_worker(loader)
+        loader.start()
 
+    @Slot(int, object, object, str)
+    def on_artist_details_loaded(self, request_id, artist_id, artist_info, bio):
+        if (
+            request_id != self.artist_details_request_id
+            or artist_id != self.current_artist_id
+        ):
+            return
+
+        self.art_bio.setText(bio if bio else "No biography available.")
         cover_id = artist_info.get("coverArt")
         if cover_id:
             self.load_cover_art(
@@ -295,17 +334,26 @@ class MainWindowLibrary:
                 lambda data, requested_artist_id=artist_id:
                     self.on_artist_art_downloaded(data, requested_artist_id),
             )
-        else:
-            self.art_image.clear()
 
         self.current_artist_albums = artist_info.get("album", [])
         row, col = 0, 0
         for album in self.current_artist_albums:
             self.add_album_card(album, self.artist_albums_grid, row, col)
             col += 1
-            if col > 2: 
+            if col > 2:
                 col = 0
                 row += 1
+        self.load_visible_album_art()
+
+    @Slot(int, object, str)
+    def on_artist_details_failed(self, request_id, artist_id, message):
+        if (
+            request_id != self.artist_details_request_id
+            or artist_id != self.current_artist_id
+        ):
+            return
+        self.art_bio.setText("Could not load artist details.")
+        QMessageBox.warning(self, "Artist Load Failed", message)
     def on_artist_art_downloaded(self, data, artist_id):
         if artist_id != self.current_artist_id:
             return
@@ -375,12 +423,45 @@ class MainWindowLibrary:
         self.open_artist_details(item.data(Qt.UserRole), item.text())
     def perform_search(self):
         query = self.search_input.text().strip()
-        if not query: return
-        
+        if not query or not self.client:
+            return
+
+        self.search_request_id += 1
+        request_id = self.search_request_id
+        self.search_results_data = []
         self.search_results_list.clear()
-        for song in self.client.search(query):
-            item = QListWidgetItem(f"{song.get('title', 'Unknown')}    —    {song.get('artist', 'Unknown')}")
+        self.search_results_list.addItem("Searching...")
+        self.switch_view(4)
+        loader = SearchLoader(request_id, self.client, query)
+        loader.loaded.connect(self.on_search_loaded)
+        loader.failed.connect(self.on_search_failed)
+        self.keep_background_worker(loader)
+        loader.start()
+
+    @Slot(int, str, object)
+    def on_search_loaded(self, request_id, query, songs):
+        if request_id != self.search_request_id or query != self.search_input.text().strip():
+            return
+
+        self.search_results_data = songs
+        self.search_results_list.clear()
+        for song in songs:
+            item = QListWidgetItem(
+                f"{song.get('title', 'Unknown')}    —    "
+                f"{song.get('artist', 'Unknown')}"
+            )
+            item.setData(Qt.UserRole, song)
             self.search_results_list.addItem(item)
+        self.switch_view(4)
+
+    @Slot(int, str, str)
+    def on_search_failed(self, request_id, query, message):
+        if request_id != self.search_request_id or query != self.search_input.text().strip():
+            return
+        self.search_results_data = []
+        self.search_results_list.clear()
+        self.search_results_list.addItem("Search failed.")
+        QMessageBox.warning(self, "Search Failed", message)
         self.switch_view(4)
     def animate_album_click(self, widget, on_finished=None):
         rect = widget.geometry()

@@ -1,7 +1,7 @@
 import logging
 
 from PySide6.QtWidgets import (
-    QMainWindow, QMessageBox, QListWidgetItem, QGraphicsOpacityEffect,
+    QMainWindow, QMessageBox, QListWidgetItem, QLabel, QGraphicsOpacityEffect,
 )
 from PySide6.QtCore import (
     Qt, QEvent, QRect, QUrl, QPropertyAnimation, QEasingCurve, QTimer,
@@ -101,6 +101,9 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.background_workers = []
         self.library_load_id = 0
         self.lyrics_request_id = 0
+        self.artist_details_request_id = 0
+        self.search_request_id = 0
+        self.search_results_data = []
         self.songs_data = []
         self.artists_data = []
         self.albums_data = []
@@ -143,6 +146,17 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.player.track_changed.connect(self.on_track_changed)
 
         self.setup_main_ui()
+        self.albums_scroll.verticalScrollBar().valueChanged.connect(
+            self.load_visible_album_art
+        )
+        self.artist_albums_scroll.verticalScrollBar().valueChanged.connect(
+            self.load_visible_album_art
+        )
+        self.content_stack.currentChanged.connect(
+            lambda index: QTimer.singleShot(0, self.load_visible_album_art)
+            if index >= 0
+            else None
+        )
         self.view_transition_effect = QGraphicsOpacityEffect(self.content_stack)
         self.content_stack.setGraphicsEffect(self.view_transition_effect)
         self.view_transition_animation = None
@@ -152,6 +166,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.playback_state_timer.timeout.connect(self.save_playback_state)
         self.playback_state_timer.start()
         self.setup_overlays()
+        QTimer.singleShot(0, self.load_visible_album_art)
         QTimer.singleShot(0, self.load_all_data)
 
     def eventFilter(self, obj, event):
@@ -263,6 +278,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             self.artists_data = []
             self.albums_data = []
             self.current_playlists = []
+            self.search_results_data = []
             self.artists_list.clear()
             self.songs_table.setRowCount(0)
             self.playlists_list.clear()
@@ -445,6 +461,38 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         reply.finished.connect(
             finish_request, Qt.ConnectionType.SingleShotConnection
         )
+
+    def load_visible_album_art(self):
+        for grid, scroll_area, size in (
+            (self.albums_grid, self.albums_scroll, 300),
+            (self.artist_albums_grid, self.artist_albums_scroll, 300),
+        ):
+            viewport = scroll_area.viewport()
+            visible_rect = viewport.rect()
+            for index in range(grid.count()):
+                card = grid.itemAt(index).widget()
+                if not card or not card.isVisible():
+                    continue
+                card_position = card.mapTo(viewport, card.rect().topLeft())
+                if not visible_rect.intersects(card.rect().translated(card_position)):
+                    continue
+
+                image_label = card.findChild(QLabel, "albumImage")
+                if not image_label or image_label.property("artworkLoaded"):
+                    continue
+                cover_id = image_label.property("coverId")
+                if not cover_id:
+                    continue
+
+                image_label.setProperty("artworkLoaded", True)
+                self.load_cover_art(
+                    str(cover_id),
+                    size,
+                    lambda data, label=image_label:
+                        self.on_album_art_downloaded(data, label)
+                        if isValid(label)
+                        else None,
+                )
 
     def save_current_app_state(self):
         self.app_state["recently_played"] = self.recently_played[:20]

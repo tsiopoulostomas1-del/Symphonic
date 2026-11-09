@@ -344,6 +344,8 @@ class MainWindowPlayback:
         self.now_playing_overlay.resize(self.centralWidget().size())
         self.now_playing_overlay.show()
         self.now_playing_overlay.raise_()
+        if event is not None:
+            event.accept()
     def close_now_playing_view(self):
         self.now_playing_overlay.hide()
     def play_songs(self, songs_list, start_index):
@@ -389,7 +391,13 @@ class MainWindowPlayback:
     def on_song_table_double_clicked(self, index):
         self.play_songs(self.songs_data, index.row())
     def on_search_result_double_clicked(self, item):
-        self.play_songs(self.client.search(self.search_input.text().strip()), self.search_results_list.row(item))
+        song = item.data(Qt.UserRole)
+        if not isinstance(song, dict):
+            return
+        self.play_songs(
+            self.search_results_data,
+            self.search_results_list.row(item),
+        )
     def on_track_changed(self, song):
         self.current_song_id = song["id"]
         self.scrobbled_song_id = None
