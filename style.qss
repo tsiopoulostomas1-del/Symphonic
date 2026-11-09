@@ -437,6 +437,20 @@ QMenu::item:selected {
     color: #FFFFFF;
 }
 
+#albumTrackLikeBtn {
+    background: transparent;
+    border: none;
+    color: #64748B;
+    font-size: 19px;
+    padding: 0;
+}
+#albumTrackLikeBtn[liked="true"] {
+    color: #00E5FF;
+}
+#albumTrackLikeBtn:hover {
+    color: #FFFFFF;
+}
+
 #playlistLabel {
     color: #64748B;
     font-size: 11px;

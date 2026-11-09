@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QListWidgetItem, QTableWidgetItem,
+    QWidget, QVBoxLayout, QLabel, QListWidgetItem, QTableWidgetItem, QPushButton,
     QMenu, QInputDialog, QMessageBox,
 )
 from PySide6.QtCore import Qt, QTime, QThread, Signal, Slot
@@ -267,6 +267,81 @@ class MainWindowLibrary:
             self.ad_table.setItem(row, 0, item_num)
             self.ad_table.setItem(row, 1, QTableWidgetItem(title))
             self.ad_table.setItem(row, 2, QTableWidgetItem(dur_str))
+            like_button = QPushButton("♥" if song.get("starred") else "♡")
+            like_button.setObjectName("albumTrackLikeBtn")
+            like_button.setProperty("liked", bool(song.get("starred")))
+            like_button.setCheckable(True)
+            like_button.setChecked(bool(song.get("starred")))
+            like_button.setFixedSize(32, 32)
+            self.ad_table.setRowHeight(row, 36)
+            like_button.setCursor(Qt.PointingHandCursor)
+            like_button.setToolTip(
+                "Remove from liked songs" if song.get("starred") else "Like song"
+            )
+            like_button.clicked.connect(
+                lambda checked, song_row=row:
+                    self.toggle_album_song_like(song_row, checked)
+            )
+            self.ad_table.setCellWidget(row, 3, like_button)
+
+    def toggle_album_song_like(self, row, checked=None):
+        if not self.client or not 0 <= row < len(self.current_album_songs):
+            return
+
+        song = self.current_album_songs[row]
+        should_star = (
+            not bool(song.get("starred")) if checked is None else checked
+        )
+        try:
+            self.client.star_song(song["id"], should_star)
+        except Exception as exc:
+            button = self.ad_table.cellWidget(row, 3)
+            if button:
+                button.setChecked(bool(song.get("starred")))
+            QMessageBox.warning(self, "Like Song Failed", str(exc))
+            return
+
+        if should_star:
+            song["starred"] = True
+        else:
+            song.pop("starred", None)
+
+        if song_id := song.get("id"):
+            for library_song in self.songs_data:
+                if library_song.get("id") == song_id:
+                    if should_star:
+                        library_song["starred"] = True
+                    else:
+                        library_song.pop("starred", None)
+            if should_star:
+                if not any(
+                    liked.get("id") == song_id
+                    for liked in self.liked_songs_data
+                ):
+                    self.liked_songs_data.append(song)
+            else:
+                self.liked_songs_data = [
+                    liked for liked in self.liked_songs_data
+                    if liked.get("id") != song_id
+                ]
+            if song_id == self.current_song_id:
+                self.btn_like.setText("♥" if should_star else "♡")
+                self.btn_like.setStyleSheet(
+                    "color: #00E5FF; font-size: 20px;"
+                    if should_star
+                    else "color: #94A3B8; font-size: 20px;"
+                )
+
+        button = self.ad_table.cellWidget(row, 3)
+        if button:
+            button.setText("♥" if should_star else "♡")
+            button.setProperty("liked", should_star)
+            button.setChecked(should_star)
+            button.style().unpolish(button)
+            button.style().polish(button)
+            button.setToolTip(
+                "Remove from liked songs" if should_star else "Like song"
+            )
     def on_ad_art_downloaded(self, data, album_id):
         if album_id != self.current_album_id:
             return

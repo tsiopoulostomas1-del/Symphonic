@@ -520,3 +520,5 @@ class MainWindowPlayback:
         self.big_seek.setRange(0, duration)
     def update_play_buttons(self, state):
         self.btn_play.setText("❚❚" if state == QMediaPlayer.PlayingState else "▶")
+        if self.taskbar_controls:
+            self.taskbar_controls.set_playing(state == QMediaPlayer.PlayingState)

@@ -13,6 +13,9 @@ vaihtoehto olemassa oleville Subsonic-asiakkaille.
 - Artistibiot Last.fm:stä
 - Synkronoidut lyriikat LRCLIB:stä
 - Tykkäykset, soittolistat
+- Kappaleiden tykkäys suoraan albumin kappalelistasta.
+- Windowsin tehtäväpalkin esikatselun edellinen-, toista/tauko- ja seuraava-painikkeet.
+- Toiston lyhyt äänenvoimakkuuden häivytys tauolle ja takaisin.
 - Scrobblaus Navidromelle
 - Albumikuvien paikallinen välimuisti vähentää toistuvia latauksia.
 - Viimeksi kuunnellut kappaleet ja kuuntelukohdan palautus.

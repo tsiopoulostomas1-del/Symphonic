@@ -1,14 +1,23 @@
+import ctypes
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QListWidget, QListWidgetItem
+from PySide6.QtMultimedia import QMediaPlayer
+from PySide6.QtWidgets import (
+    QApplication, QListWidget, QListWidgetItem, QPushButton,
+)
 
+from app.player import Player
 from app.subsonic import SubsonicClient
 from app.main_window import LibraryLoader
-from app.window_library import ArtistDetailsLoader, SearchLoader
+from app.window_library import ArtistDetailsLoader, MainWindowLibrary, SearchLoader
 from app.window_playback import MainWindowPlayback
+from app.windows_taskbar import (
+    BUTTON_NEXT, BUTTON_PLAY_PAUSE, BUTTON_PREVIOUS, THBN_CLICKED, WM_COMMAND,
+    WindowsTaskbarControls, _NativeMessage,
+)
 
 
 class SubsonicClientTests(unittest.TestCase):
@@ -72,6 +81,175 @@ class SubsonicClientTests(unittest.TestCase):
             ValueError, "missing the expected 'albumList2' section"
         ):
             client.get_albums()
+
+    @patch("app.subsonic.requests.get")
+    def test_star_song_checks_subsonic_response(self, mock_get):
+        response = Mock()
+        response.json.return_value = {
+            "subsonic-response": {
+                "status": "failed",
+                "error": {"code": 40, "message": "Wrong username or password"},
+            }
+        }
+        mock_get.return_value = response
+        client = SubsonicClient("http://server", "user", "password")
+
+        with self.assertRaisesRegex(RuntimeError, "Wrong username or password"):
+            client.star_song("song-1")
+
+        self.assertTrue(mock_get.call_args.args[0].endswith("/rest/star.view"))
+        self.assertEqual(mock_get.call_args.kwargs["params"]["id"], "song-1")
+
+    def test_album_song_like_updates_local_state_after_server_success(self):
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+        song = {"id": "song-1"}
+        button = QPushButton("♡")
+        window = SimpleNamespace(
+            client=Mock(),
+            current_album_songs=[song],
+            songs_data=[song],
+            liked_songs_data=[],
+            current_song_id=None,
+            ad_table=Mock(),
+        )
+        window.ad_table.cellWidget.return_value = button
+
+        MainWindowLibrary.toggle_album_song_like(window, 0)
+
+        window.client.star_song.assert_called_once_with("song-1", True)
+        self.assertTrue(song["starred"])
+        self.assertEqual(window.liked_songs_data, [song])
+        self.assertEqual(button.text(), "♥")
+
+        MainWindowLibrary.toggle_album_song_like(window, 0)
+
+        window.client.star_song.assert_has_calls(
+            [call("song-1", True), call("song-1", False)]
+        )
+        self.assertNotIn("starred", song)
+        self.assertEqual(window.liked_songs_data, [])
+        self.assertEqual(button.text(), "♡")
+
+    def test_player_fades_pause_and_resume_without_changing_user_volume(self):
+        self.assertIsNotNone(QApplication.instance() or QApplication([]))
+        player = Player()
+        player.media_player = Mock()
+        player.media_player.playbackState.return_value = QMediaPlayer.PlayingState
+        player.audio_output = Mock()
+        player._user_volume = 0.6
+
+        try:
+            player.toggle_play_pause()
+            self.assertTrue(player._pause_after_fade)
+            player._apply_fade_progress(0.5)
+            self.assertAlmostEqual(
+                player.audio_output.setVolume.call_args.args[0], 0.3
+            )
+            player.set_volume(40)
+            self.assertAlmostEqual(
+                player.audio_output.setVolume.call_args.args[0], 0.2
+            )
+            player._apply_fade_progress(1.0)
+            player.media_player.pause.assert_called_once_with()
+            self.assertEqual(player._volume_level, 0.0)
+            self.assertAlmostEqual(player._user_volume, 0.4)
+
+            player.media_player.playbackState.return_value = (
+                QMediaPlayer.PausedState
+            )
+            player.toggle_play_pause()
+            player.media_player.play.assert_called_once_with()
+            self.assertEqual(player._volume_level, 0.0)
+            player._apply_fade_progress(0.5)
+            self.assertAlmostEqual(
+                player.audio_output.setVolume.call_args.args[0], 0.2
+            )
+            player._apply_fade_progress(1.0)
+            self.assertAlmostEqual(
+                player.audio_output.setVolume.call_args.args[0], 0.4
+            )
+        finally:
+            player._fade_timer.stop()
+
+    def test_taskbar_thumbnail_commands_dispatch_to_player_actions(self):
+        controls = WindowsTaskbarControls.__new__(WindowsTaskbarControls)
+        calls = []
+        controls._commands = {
+            BUTTON_PREVIOUS: lambda: calls.append("previous"),
+            BUTTON_PLAY_PAUSE: lambda: calls.append("toggle"),
+            BUTTON_NEXT: lambda: calls.append("next"),
+        }
+        controls._added_hwnd = 1
+        controls.taskbar_button_created = 0xC001
+
+        for button_id, expected in (
+            (BUTTON_PREVIOUS, "previous"),
+            (BUTTON_PLAY_PAUSE, "toggle"),
+            (BUTTON_NEXT, "next"),
+        ):
+            message = _NativeMessage()
+            message.hwnd = 1
+            message.message = WM_COMMAND
+            message.wParam = (THBN_CLICKED << 16) | button_id
+            self.assertTrue(
+                controls.nativeEventFilter(
+                    b"windows_generic_MSG", ctypes.addressof(message)
+                )
+            )
+            self.assertEqual(calls[-1], expected)
+
+        self.assertFalse(
+            controls.nativeEventFilter(
+                b"other_native_event", ctypes.addressof(message)
+            )
+        )
+
+    def test_taskbar_button_created_message_registers_toolbar_for_its_window(self):
+        controls = WindowsTaskbarControls.__new__(WindowsTaskbarControls)
+        controls.taskbar_button_created = 0xC001
+        controls.add_buttons = Mock()
+        message = _NativeMessage()
+        message.hwnd = 1234
+        message.message = controls.taskbar_button_created
+
+        self.assertFalse(
+            controls.nativeEventFilter(
+                b"windows_generic_MSG", ctypes.addressof(message)
+            )
+        )
+
+        controls.add_buttons.assert_called_once_with(1234)
+
+    def test_taskbar_playback_icon_updates_after_native_event_returns(self):
+        app = QApplication.instance() or QApplication([])
+        controls = WindowsTaskbarControls.__new__(WindowsTaskbarControls)
+        controls._icons = {
+            "previous": 1,
+            "play": 2,
+            "pause": 3,
+            "next": 4,
+        }
+        controls._playing = False
+        controls._added_hwnd = 1234
+        controls._taskbar = Mock()
+        controls._call = Mock()
+
+        controls.set_playing(True)
+        controls._call.assert_not_called()
+        app.processEvents()
+
+        pause_buttons = controls._call.call_args.args[4][1]
+        self.assertEqual(pause_buttons[1].hIcon, 3)
+        self.assertEqual(pause_buttons[1].szTip, "Pause")
+
+        controls._call.reset_mock()
+        controls.set_playing(False)
+        app.processEvents()
+
+        play_buttons = controls._call.call_args.args[4][1]
+        self.assertEqual(play_buttons[1].hIcon, 2)
+        self.assertEqual(play_buttons[1].szTip, "Play")
 
 
     def test_library_loader_emits_available_albums_before_later_failure(self):

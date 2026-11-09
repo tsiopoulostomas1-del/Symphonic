@@ -150,3 +150,12 @@ Korjattu sovelluksessa muutama error ja bugi jonka takia kirjasto kuten albumit 
     - Hakutuloksen toisto käyttää valittua kappaletta suoraan eikä hae tuloksia uudelleen.
 
     - Kun avaat sovelluksen, se skaalautuu Full Screen moodissa, eli sovellus ei ole pienennettynä ikkunana.
+
+
+    OSA 5
+
+    Tehtäväpalkissa sovelluksessa näkyy Play/Pause, Previous ja Next painikkeet. Toimivat myös oikein.
+
+    OSA 6
+
+    Toiston tauottamiseen ja jatkamiseen lisättiin lyhyt äänenvoimakkuuden häivytys. Häivytys säilyttää käyttäjän valitseman äänenvoimakkuuden.

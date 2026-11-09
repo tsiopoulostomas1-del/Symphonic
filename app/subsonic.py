@@ -197,7 +197,10 @@ class SubsonicClient:
         params = self._generate_auth()
         params["id"] = song_id
         action = "star" if star else "unstar"
-        requests.get(f"{self.server}/rest/{action}.view", params=params, timeout=15)
+        response = requests.get(
+            f"{self.server}/rest/{action}.view", params=params, timeout=15
+        )
+        self._parse_response(response)
 
     def get_starred_songs(self) -> list:
         params = self._generate_auth()

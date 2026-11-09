@@ -1,7 +1,10 @@
 import logging
+import os
 
+from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtWidgets import (
-    QMainWindow, QMessageBox, QListWidgetItem, QLabel, QGraphicsOpacityEffect,
+    QApplication, QMainWindow, QMessageBox, QListWidgetItem, QLabel,
+    QGraphicsOpacityEffect,
 )
 from PySide6.QtCore import (
     Qt, QEvent, QRect, QUrl, QPropertyAnimation, QEasingCurve, QTimer,
@@ -20,6 +23,7 @@ from app.widgets.settings_dialog import SettingsDialog
 from app.window_ui import MainWindowUI
 from app.window_library import MainWindowLibrary
 from app.window_playback import MainWindowPlayback
+from app.windows_taskbar import WindowsTaskbarControls
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +148,22 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.player.duration_changed.connect(self.set_seek_bar_ranges)
         self.player.playback_state_changed.connect(self.update_play_buttons)
         self.player.track_changed.connect(self.on_track_changed)
+        self.taskbar_controls = None
+        if os.name == "nt":
+            try:
+                self.taskbar_controls = WindowsTaskbarControls(
+                    self.player.prev,
+                    self.player.toggle_play_pause,
+                    self.player.next,
+                )
+                application = QApplication.instance()
+                if application is not None:
+                    application.installNativeEventFilter(self.taskbar_controls)
+            except OSError:
+                logger.warning(
+                    "Windows taskbar playback controls are unavailable.",
+                    exc_info=True,
+                )
 
         self.setup_main_ui()
         self.albums_scroll.verticalScrollBar().valueChanged.connect(
@@ -166,8 +186,16 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.playback_state_timer.timeout.connect(self.save_playback_state)
         self.playback_state_timer.start()
         self.setup_overlays()
+        QTimer.singleShot(0, self.setup_taskbar_controls)
         QTimer.singleShot(0, self.load_visible_album_art)
         QTimer.singleShot(0, self.load_all_data)
+
+    def setup_taskbar_controls(self):
+        if self.taskbar_controls:
+            self.taskbar_controls.set_playing(
+                self.player.media_player.playbackState()
+                == QMediaPlayer.PlayingState
+            )
 
     def eventFilter(self, obj, event):
         # ONLY trigger the hover logic if the lyrics overlay is currently visible!
@@ -532,4 +560,10 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
 
     def closeEvent(self, event):
         self.save_playback_state()
+        if self.taskbar_controls:
+            application = QApplication.instance()
+            if application is not None:
+                application.removeNativeEventFilter(self.taskbar_controls)
+            self.taskbar_controls.close()
+            self.taskbar_controls = None
         super().closeEvent(event)
