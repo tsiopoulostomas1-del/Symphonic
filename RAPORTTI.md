@@ -132,3 +132,13 @@ Korjattu isohkoja bugeja main_window.py, services, settings, subsonic yms.
     OSA 3
 
         - Lisätty muutama teksti Log In / Settings osioon, aina 2.5 sekunnin jälkeen vaihtuu teksti toiseen pienellä fade in animaatiolla.
+
+### 9.11.2026
+
+Korjattu sovelluksessa muutama error ja bugi jonka takia kirjasto kuten albumit ja muut asiat eivät latautuneet
+
+- Ohjelma lataa nyt oikein tiedot
+
+- Vaihdoin kappaleiden haun tyhjästä search3-haun kyselystä albumien kappalelistojen hakuun app/subsonic.py.
+
+- Lisäsin tarkemmat lataustilat ja virheilmoituksen, jos odotettu API-vastaus puuttuu, sekä tein tilatekstistä näkyvämmän app/window_ui.py.

@@ -9,6 +9,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 from PySide6.QtGui import QPixmap
+from shiboken6 import isValid
 
 from app.app_state import load_app_state, save_app_state
 from app.artwork_cache import ArtworkCache
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 class LibraryLoader(QThread):
     loaded = Signal(int, object, object)
+    completed = Signal(int, object)
     failed = Signal(int, object, str)
     progress = Signal(int, str)
 
@@ -34,29 +36,46 @@ class LibraryLoader(QThread):
         self.client = client
 
     def run(self):
+        stage = "server connection"
         try:
             self.progress.emit(self.request_id, "Checking server...")
             if not self.client.ping():
                 raise ConnectionError(
                     self.client.ping_error or "Could not connect to the Navidrome server."
                 )
-            self.progress.emit(self.request_id, "Loading songs...")
-            songs = self.client.get_all_songs()
-            self.progress.emit(self.request_id, "Loading artists...")
-            artists = self.client.get_artists()
+
+            stage = "albums"
             self.progress.emit(self.request_id, "Loading albums...")
             albums = self.client.get_albums()
+            self.loaded.emit(self.request_id, self.client, {"albums": albums})
+
+            stage = "artists"
+            self.progress.emit(self.request_id, "Loading artists...")
+            artists = self.client.get_artists()
+            self.loaded.emit(self.request_id, self.client, {"artists": artists})
+
+            stage = "songs"
+            self.progress.emit(self.request_id, "Loading songs...")
+            songs = self.client.get_all_songs(
+                albums,
+                progress_callback=lambda current, total: self.progress.emit(
+                    self.request_id,
+                    f"Loading songs ({current}/{total} albums)...",
+                ),
+            )
+            self.loaded.emit(self.request_id, self.client, {"songs": songs})
+
+            stage = "playlists"
             self.progress.emit(self.request_id, "Loading playlists...")
             playlists = self.client.get_playlists()
-            data = {
-                "songs": songs,
-                "artists": artists,
-                "albums": albums,
-                "playlists": playlists,
-            }
-            self.loaded.emit(self.request_id, self.client, data)
+            self.loaded.emit(
+                self.request_id, self.client, {"playlists": playlists}
+            )
+            self.completed.emit(self.request_id, self.client)
         except Exception as exc:
-            self.failed.emit(self.request_id, self.client, str(exc))
+            self.failed.emit(
+                self.request_id, self.client, f"{stage.title()} loading failed: {exc}"
+            )
 
 
 class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindow):
@@ -83,6 +102,8 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.library_load_id = 0
         self.lyrics_request_id = 0
         self.songs_data = []
+        self.artists_data = []
+        self.albums_data = []
         self.current_song_id = None
         self.scrobbled_song_id = None
         self.last_playback_position = None
@@ -131,7 +152,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.playback_state_timer.timeout.connect(self.save_playback_state)
         self.playback_state_timer.start()
         self.setup_overlays()
-        self.load_all_data()
+        QTimer.singleShot(0, self.load_all_data)
 
     def eventFilter(self, obj, event):
         # ONLY trigger the hover logic if the lyrics overlay is currently visible!
@@ -238,14 +259,21 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             self.settings = load_settings()
             self.sync_state_server()
             self.client = SubsonicClient(self.settings["server"], self.settings["username"], self.settings["password"])
+            self.songs_data = []
+            self.artists_data = []
+            self.albums_data = []
+            self.current_playlists = []
             self.artists_list.clear()
             self.songs_table.setRowCount(0)
+            self.playlists_list.clear()
             for i in reversed(range(self.albums_grid.count())): 
                 widget = self.albums_grid.itemAt(i).widget()
                 if widget: widget.setParent(None)
             self.load_all_data()
     def load_all_data(self):
         if not self.client:
+            self.library_progress.hide()
+            self.library_status.setText("Not connected. Configure a server in Settings.")
             self.open_settings()
             return
 
@@ -254,6 +282,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         client = self.client
         worker = LibraryLoader(load_id, client)
         worker.loaded.connect(self.on_library_loaded)
+        worker.completed.connect(self.on_library_load_completed)
         worker.failed.connect(self.on_library_load_failed)
         worker.progress.connect(self.on_library_load_progress)
         self.library_status.setText("Connecting...")
@@ -274,38 +303,62 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         if request_id != self.library_load_id or client is not self.client:
             return
 
-        self.songs_data = data["songs"]
-        self.populate_songs_table(self.songs_data)
+        if "songs" in data:
+            self.songs_data = data["songs"]
+            self.populate_songs_table(self.songs_data)
 
-        self.artists_list.clear()
-        for artist in data["artists"]:
-            item = QListWidgetItem(artist.get("name", "Unknown"))
-            item.setData(Qt.UserRole, artist.get("id"))
-            self.artists_list.addItem(item)
+        if "artists" in data:
+            self.artists_data = data["artists"]
+            self.artists_list.clear()
+            for artist in self.artists_data:
+                item = QListWidgetItem(artist.get("name", "Unknown"))
+                item.setData(Qt.UserRole, artist.get("id"))
+                self.artists_list.addItem(item)
 
-        for i in reversed(range(self.albums_grid.count())):
-            widget = self.albums_grid.itemAt(i).widget()
-            if widget:
-                widget.setParent(None)
+        if "albums" in data:
+            self.albums_data = data["albums"]
+            for i in reversed(range(self.albums_grid.count())):
+                widget = self.albums_grid.itemAt(i).widget()
+                if widget:
+                    widget.setParent(None)
 
-        row, col = 0, 0
-        for album in data["albums"]:
-            self.add_album_card(album, self.albums_grid, row, col)
-            col += 1
-            if col > 4:
-                col = 0
-                row += 1
+            row, col = 0, 0
+            for album in self.albums_data:
+                self.add_album_card(album, self.albums_grid, row, col)
+                col += 1
+                if col > 4:
+                    col = 0
+                    row += 1
                 
-        self.current_playlists = data["playlists"]
-        self.playlists_list.clear()
-        for p in self.current_playlists:
-            item = QListWidgetItem(p["name"])
-            item.setData(Qt.UserRole, p["id"])
-            self.playlists_list.addItem(item)
+        if "playlists" in data:
+            self.current_playlists = data["playlists"]
+            self.playlists_list.clear()
+            for playlist in self.current_playlists:
+                item = QListWidgetItem(playlist["name"])
+                item.setData(Qt.UserRole, playlist["id"])
+                self.playlists_list.addItem(item)
 
-        song_count = len(data["songs"])
-        artist_count = len(data["artists"])
-        album_count = len(data["albums"])
+        if "albums" in data:
+            self.library_status.setText(
+                f"Loaded {len(self.albums_data)} albums; loading library..."
+            )
+        elif "artists" in data:
+            self.library_status.setText(
+                f"Loaded {len(self.artists_data)} artists; loading songs..."
+            )
+        elif "songs" in data:
+            self.library_status.setText(
+                f"Loaded {len(self.songs_data)} songs; loading playlists..."
+            )
+
+    @Slot(int, object)
+    def on_library_load_completed(self, request_id, client):
+        if request_id != self.library_load_id or client is not self.client:
+            return
+
+        song_count = len(self.songs_data)
+        artist_count = len(self.artists_data)
+        album_count = len(self.albums_data)
         self.library_status.setText(
             f"Loaded {song_count} songs, {artist_count} artists, {album_count} albums"
         )
@@ -332,11 +385,10 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
     def on_library_load_failed(self, request_id, client, message):
         if request_id != self.library_load_id or client is not self.client:
             return
-        self.songs_data = []
-        self.songs_table.setRowCount(0)
         self.library_progress.hide()
         self.retry_library_button.show()
-        self.library_status.setText("Library load failed")
+        stage = message.partition(" loading failed:")[0]
+        self.library_status.setText(f"Library load failed during {stage.lower()}")
         QMessageBox.warning(self, "Library Load Failed", message)
 
     def load_cover_art(self, cover_id, size, callback):
@@ -358,8 +410,20 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             QUrl(self.client.get_cover_art_url(str(cover_id), size=size))
         )
         reply = self.network_manager.get(request)
+        finished = False
 
         def finish_request():
+            nonlocal finished
+            if finished:
+                return
+            finished = True
+            if not isValid(reply):
+                logger.warning(
+                    "Artwork reply was disposed before it could be processed: %s",
+                    cover_id,
+                )
+                return
+
             if reply.error() == QNetworkReply.NoError:
                 data = bytes(reply.readAll())
                 image = QPixmap()
@@ -378,7 +442,9 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
                 callback(b"")
             reply.deleteLater()
 
-        reply.finished.connect(finish_request)
+        reply.finished.connect(
+            finish_request, Qt.ConnectionType.SingleShotConnection
+        )
 
     def save_current_app_state(self):
         self.app_state["recently_played"] = self.recently_played[:20]

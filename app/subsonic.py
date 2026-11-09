@@ -1,6 +1,8 @@
 import hashlib
 import secrets
 import requests
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlencode
 
 
@@ -34,6 +36,17 @@ class SubsonicClient:
             raise RuntimeError(message)
         return subsonic_response
 
+    @staticmethod
+    def _response_section(response: dict, key: str) -> dict:
+        section = response.get(key)
+        if not isinstance(section, dict):
+            received = ", ".join(sorted(response)) or "no response fields"
+            raise ValueError(
+                f"The server response is missing the expected '{key}' section "
+                f"(received: {received})."
+            )
+        return section
+
     def _generate_auth(self) -> dict:
         salt = secrets.token_hex(6)
         token = hashlib.md5((self.password + salt).encode("utf-8")).hexdigest()
@@ -56,24 +69,30 @@ class SubsonicClient:
             self.ping_error = f"Server returned an invalid response: {exc}"
         return False
 
-    def get_all_songs(self) -> list:
-        params = self._generate_auth()
-        params["query"] = ""
-        page_size = 500
+    def get_all_songs(
+        self,
+        albums: list | None = None,
+        progress_callback: Callable[[int, int], None] | None = None,
+    ) -> list:
+        if albums is None:
+            albums = self.get_albums()
+
         songs = []
-        offset = 0
-        while True:
-            params["songCount"] = page_size
-            params["songOffset"] = offset
-            resp = requests.get(
-                f"{self.server}/rest/search3.view", params=params, timeout=15
-            )
-            result = self._parse_response(resp).get("searchResult3", {})
-            batch = self._as_list(result.get("song"))
-            songs.extend(batch)
-            if len(batch) < page_size:
-                return songs
-            offset += len(batch)
+
+        def fetch_album_songs(album: dict) -> list:
+            album_id = album.get("id")
+            if album_id:
+                return self.get_album_songs(str(album_id))
+            return []
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            for index, album_songs in enumerate(
+                executor.map(fetch_album_songs, albums), start=1
+            ):
+                songs.extend(album_songs)
+                if progress_callback:
+                    progress_callback(index, len(albums))
+        return songs
 
     def get_albums(self) -> list:
         params = self._generate_auth()
@@ -87,7 +106,9 @@ class SubsonicClient:
             resp = requests.get(
                 f"{self.server}/rest/getAlbumList2.view", params=params, timeout=15
             )
-            result = self._parse_response(resp).get("albumList2", {})
+            result = self._response_section(
+                self._parse_response(resp), "albumList2"
+            )
             batch = self._as_list(result.get("album"))
             albums.extend(batch)
             if len(batch) < page_size:
@@ -99,9 +120,10 @@ class SubsonicClient:
         resp = requests.get(
             f"{self.server}/rest/getArtists.view", params=params, timeout=15
         )
-        indexes = self._as_list(
-            self._parse_response(resp).get("artists", {}).get("index")
+        artists_response = self._response_section(
+            self._parse_response(resp), "artists"
         )
+        indexes = self._as_list(artists_response.get("index"))
         artists = []
         for idx in indexes:
             artists.extend(self._as_list(idx.get("artist")))
@@ -113,7 +135,7 @@ class SubsonicClient:
         resp = requests.get(
             f"{self.server}/rest/getAlbum.view", params=params, timeout=15
         )
-        album = self._parse_response(resp).get("album", {})
+        album = self._response_section(self._parse_response(resp), "album")
         return self._as_list(album.get("song"))
 
     def get_artist_songs(self, artist_id: str) -> list:
