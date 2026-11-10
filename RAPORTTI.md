@@ -159,3 +159,10 @@ Korjattu sovelluksessa muutama error ja bugi jonka takia kirjasto kuten albumit 
     OSA 6
 
     Toiston tauottamiseen ja jatkamiseen lisättiin lyhyt äänenvoimakkuuden häivytys. Häivytys säilyttää käyttäjän valitseman äänenvoimakkuuden.
+
+
+### 10.11.2026
+
+    OSA 7 
+    
+Tänään on enimmäkseen suunniteltu seuraavia vaiheita ja opeteltu ja luettu koodia läpi. Mahdollisesti pieniä muutoksia tulossa.
