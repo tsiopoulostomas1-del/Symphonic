@@ -164,5 +164,19 @@ Korjattu sovelluksessa muutama error ja bugi jonka takia kirjasto kuten albumit 
 ### 10.11.2026
 
     OSA 7 
-    
+
 Tänään on enimmäkseen suunniteltu seuraavia vaiheita ja opeteltu ja luettu koodia läpi. Mahdollisesti pieniä muutoksia tulossa.
+
+    OSA 8
+
+    Lisätty kolme erilaista kieltä sovellukseen, jotka voi vaihtaa Asetukset valikosta sovelluksessa.
+
+    Kielet:
+
+        - Suomi
+    
+        - Englanti (Vakio)
+
+        - Venäjä
+
+    Huom. Tulen lisäämään myöhemmin enemmän.

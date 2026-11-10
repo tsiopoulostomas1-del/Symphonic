@@ -22,6 +22,7 @@ vaihtoehto olemassa oleville Subsonic-asiakkaille.
 - Kirjaston latauksen edistymisnäyttö ja uudelleenyritys yhteysvirheissä.
 - Viimeksi käytetty päänäkymä palautetaan sovelluksen käynnistyessä.
 - Windowsissa palvelimen salasana suojataan Windows DPAPI:lla; vanhat asetukset muunnetaan automaattisesti.
+- Käyttöliittymä on saatavilla englanniksi, suomeksi ja venäjäksi.
 
 ## Teknologia
 

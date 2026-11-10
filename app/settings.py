@@ -74,19 +74,33 @@ def load_settings() -> dict:
             with open(CONFIG_FILE, "r") as f:
                 settings = json.load(f)
         except (OSError, json.JSONDecodeError):
-            return {"server": "", "username": "", "password": ""}
+            return {
+                "server": "",
+                "username": "",
+                "password": "",
+                "language": "en",
+            }
         stored_password = settings.get("password", "")
         settings["password"] = _unprotect_windows_password(stored_password)
+
+        settings.setdefault("language", "en")
+
         if os.name == "nt" and not stored_password.startswith(ENCRYPTED_PASSWORD_PREFIX):
             save_settings(
                 settings.get("server", ""),
                 settings.get("username", ""),
                 settings["password"],
+                settings["language"],
             )
         return settings
-    return {"server": "", "username": "", "password": ""}
 
-def save_settings(server: str, username: str, password: str):
+    return {"server": "",
+            "username": "",
+            "password": "",
+            "language": "en"}
+
+
+def save_settings(server: str, username: str, password: str, language: str = "en"):
     if not os.path.exists(CONFIG_DIR):
         os.makedirs(CONFIG_DIR)
     with open(CONFIG_FILE, "w") as f:
@@ -95,6 +109,7 @@ def save_settings(server: str, username: str, password: str):
                 "server": server,
                 "username": username,
                 "password": _protect_windows_password(password),
+                "language": language,
             },
             f,
         )

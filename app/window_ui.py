@@ -31,12 +31,12 @@ class MainWindowUI:
         sidebar_layout.addWidget(logo)
         sidebar_layout.addSpacing(30)
 
-        self.btn_nav_artists = QPushButton("Artists")
-        self.btn_nav_albums = QPushButton("Albums")
-        self.btn_nav_songs = QPushButton("Songs")
-        self.btn_nav_queue = QPushButton("Queue")
-        self.btn_nav_nowplaying = QPushButton("Now Playing")
-        self.btn_nav_recent = QPushButton("Recently Played")
+        self.btn_nav_artists = QPushButton(self.text("artists"))
+        self.btn_nav_albums = QPushButton(self.text("albums"))
+        self.btn_nav_songs = QPushButton(self.text("songs"))
+        self.btn_nav_queue = QPushButton(self.text("queue"))
+        self.btn_nav_nowplaying = QPushButton(self.text("now_playing"))
+        self.btn_nav_recent = QPushButton(self.text("recently_played"))
         
         for btn in [
             self.btn_nav_artists, self.btn_nav_albums, self.btn_nav_songs,
@@ -55,15 +55,15 @@ class MainWindowUI:
         
         sidebar_layout.addSpacing(20)
         
-        self.btn_liked_songs = QPushButton("Liked Songs")
+        self.btn_liked_songs = QPushButton(self.text("liked_songs"))
         self.btn_liked_songs.setObjectName("navButton")
         self.btn_liked_songs.setCursor(Qt.PointingHandCursor)
         self.btn_liked_songs.clicked.connect(self.open_liked_songs)
         sidebar_layout.addWidget(self.btn_liked_songs)
         
-        playlist_label = QLabel("PLAYLISTS")
-        playlist_label.setObjectName("playlistLabel")
-        sidebar_layout.addWidget(playlist_label)
+        self.playlist_label = QLabel(self.text("playlists"))
+        self.playlist_label.setObjectName("playlistLabel")
+        sidebar_layout.addWidget(self.playlist_label)
         
         self.playlists_list = QListWidget()
         self.playlists_list.setObjectName("sidebarPlaylists")
@@ -73,7 +73,7 @@ class MainWindowUI:
 
         sidebar_layout.addStretch()
         
-        self.btn_nav_settings = QPushButton("Settings")
+        self.btn_nav_settings = QPushButton(self.text("settings"))
         self.btn_nav_settings.setObjectName("navButton")
         self.btn_nav_settings.setCursor(Qt.PointingHandCursor)
         self.btn_nav_settings.clicked.connect(self.open_settings)
@@ -99,18 +99,18 @@ class MainWindowUI:
         self.btn_back.hide()
         top_bar.addWidget(self.btn_back)
 
-        self.page_title = QLabel("Songs")
+        self.page_title = QLabel(self.text("songs"))
         self.page_title.setObjectName("pageTitle")
         top_bar.addWidget(self.page_title)
         top_bar.addStretch()
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search library...")
+        self.search_input.setPlaceholderText(self.text("search_library"))
         self.search_input.setObjectName("searchInput")
         self.search_input.setFixedWidth(300)
         self.search_input.returnPressed.connect(self.perform_search)
         top_bar.addWidget(self.search_input)
-        self.library_status = QLabel("Preparing library...")
+        self.library_status = QLabel(self.text("preparing_library"))
         self.library_status.setObjectName("libraryStatus")
         self.library_status.setMinimumWidth(210)
         self.library_progress = QProgressBar()
@@ -118,7 +118,7 @@ class MainWindowUI:
         self.library_progress.setRange(0, 0)
         self.library_progress.setFixedWidth(90)
         self.library_progress.hide()
-        self.retry_library_button = QPushButton("Retry")
+        self.retry_library_button = QPushButton(self.text("retry"))
         self.retry_library_button.setObjectName("navButton")
         self.retry_library_button.setCursor(Qt.PointingHandCursor)
         self.retry_library_button.clicked.connect(self.load_all_data)
@@ -163,7 +163,9 @@ class MainWindowUI:
         self.songs_table = QTableWidget()
         self.songs_table.setObjectName("songsTable")
         self.songs_table.setColumnCount(4)
-        self.songs_table.setHorizontalHeaderLabels(["Title", "Artist", "Album", "Time"])
+        self.songs_table.setHorizontalHeaderLabels([
+            self.text("title"), self.text("artist"), self.text("album"), self.text("time")
+        ])
         self.songs_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.songs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.songs_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -184,7 +186,9 @@ class MainWindowUI:
         self.queue_table = QTableWidget()
         self.queue_table.setObjectName("songsTable")
         self.queue_table.setColumnCount(3)
-        self.queue_table.setHorizontalHeaderLabels(["Title", "Artist", "Album"])
+        self.queue_table.setHorizontalHeaderLabels([
+            self.text("title"), self.text("artist"), self.text("album")
+        ])
         self.queue_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.queue_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.queue_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -219,14 +223,14 @@ class MainWindowUI:
         
         ad_info_layout = QVBoxLayout()
         ad_info_layout.setAlignment(Qt.AlignVCenter)
-        self.ad_title = QLabel("Album Title")
+        self.ad_title = QLabel(self.text("album"))
         self.ad_title.setObjectName("adTitle")
-        self.ad_artist = QLabel("Artist Name")
+        self.ad_artist = QLabel(self.text("artist"))
         self.ad_artist.setObjectName("adArtist")
-        self.ad_meta = QLabel("Year • Genre • Tracks")
+        self.ad_meta = QLabel(self.text("year_genre_tracks"))
         self.ad_meta.setObjectName("adMeta")
         
-        self.btn_play_album = QPushButton("Play Album")
+        self.btn_play_album = QPushButton(self.text("play_album"))
         self.btn_play_album.setObjectName("adPlayBtn")
         self.btn_play_album.setFixedWidth(140)
         self.btn_play_album.setCursor(Qt.PointingHandCursor)
@@ -246,7 +250,9 @@ class MainWindowUI:
         self.ad_table = QTableWidget()
         self.ad_table.setObjectName("songsTable")
         self.ad_table.setColumnCount(4)
-        self.ad_table.setHorizontalHeaderLabels(["#", "Title", "Time", ""])
+        self.ad_table.setHorizontalHeaderLabels([
+            self.text("track_number"), self.text("title"), self.text("time"), ""
+        ])
         self.ad_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.ad_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.ad_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -278,7 +284,7 @@ class MainWindowUI:
         
         art_left.addSpacing(20)
         
-        self.art_name = QLabel("Artist Name")
+        self.art_name = QLabel(self.text("artist"))
         self.art_name.setObjectName("artName")
         self.art_name.setWordWrap(True)
         art_left.addWidget(self.art_name)
@@ -296,10 +302,10 @@ class MainWindowUI:
         art_right = QVBoxLayout(art_right_widget)
         art_right.setContentsMargins(0, 0, 0, 0)
         
-        disc_title = QLabel("Discography")
-        disc_title.setObjectName("pageTitle")
-        disc_title.setStyleSheet("font-size: 24px; margin-bottom: 10px;")
-        art_right.addWidget(disc_title)
+        self.disc_title = QLabel(self.text("discography"))
+        self.disc_title.setObjectName("pageTitle")
+        self.disc_title.setStyleSheet("font-size: 24px; margin-bottom: 10px;")
+        art_right.addWidget(self.disc_title)
 
         self.artist_albums_scroll = QScrollArea()
         self.artist_albums_scroll.setWidgetResizable(True)
@@ -334,13 +340,13 @@ class MainWindowUI:
         pd_info.setAlignment(Qt.AlignBottom) 
         pd_info.setSpacing(2)
         
-        self.pd_type = QLabel("PLAYLIST")
+        self.pd_type = QLabel(self.text("playlist").upper())
         self.pd_type.setObjectName("pdType")
         
-        self.pd_title = QLabel("Title")
+        self.pd_title = QLabel(self.text("title"))
         self.pd_title.setObjectName("pdTitle")
         
-        self.pd_meta = QLabel("0 tracks")
+        self.pd_meta = QLabel(self.text("songs_count", count=0))
         self.pd_meta.setObjectName("pdMeta")
         
         pd_info.addWidget(self.pd_type)
@@ -356,7 +362,10 @@ class MainWindowUI:
         self.pd_table = QTableWidget()
         self.pd_table.setObjectName("songsTable")
         self.pd_table.setColumnCount(4)
-        self.pd_table.setHorizontalHeaderLabels(["#", "Title", "Artist", "Time"])
+        self.pd_table.setHorizontalHeaderLabels([
+            self.text("track_number"), self.text("title"),
+            self.text("artist"), self.text("time")
+        ])
         self.pd_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.pd_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.pd_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -381,13 +390,13 @@ class MainWindowUI:
         self.recent_widget = QWidget()
         recent_layout = QVBoxLayout(self.recent_widget)
         recent_layout.setContentsMargins(0, 0, 0, 0)
-        self.resume_playback_button = QPushButton("Continue Listening")
+        self.resume_playback_button = QPushButton(self.text("continue_listening"))
         self.resume_playback_button.setObjectName("adPlayBtn")
         self.resume_playback_button.setFixedWidth(190)
         self.resume_playback_button.setEnabled(False)
         self.resume_playback_button.clicked.connect(self.resume_last_playback)
         recent_layout.addWidget(self.resume_playback_button, alignment=Qt.AlignLeft)
-        self.recent_status = QLabel("Your recently played tracks will appear here.")
+        self.recent_status = QLabel(self.text("recent_empty"))
         recent_layout.addWidget(self.recent_status)
         self.recent_list = QListWidget()
         self.recent_list.setObjectName("trackList")
@@ -410,6 +419,7 @@ class MainWindowUI:
         np_over_layout.setContentsMargins(40, 40, 40, 40)
         
         close_btn = QPushButton("✕")
+        close_btn.setToolTip(self.text("close"))
         close_btn.setObjectName("closeBtn")
         close_btn.setFixedSize(36, 36)
         close_btn.clicked.connect(self.close_now_playing_view)
@@ -422,7 +432,7 @@ class MainWindowUI:
         self.big_art.setObjectName("bigArt")
         np_over_layout.addWidget(self.big_art, alignment=Qt.AlignCenter)
         
-        self.big_title = QLabel("Not Playing")
+        self.big_title = QLabel(self.text("not_playing"))
         self.big_title.setObjectName("bigTitle")
         self.big_title.setAlignment(Qt.AlignCenter)
         np_over_layout.addWidget(self.big_title)
@@ -455,6 +465,7 @@ class MainWindowUI:
         lyr_layout.setContentsMargins(40, 40, 40, 40)
         
         lyr_close_btn = QPushButton("✕")
+        lyr_close_btn.setToolTip(self.text("close"))
         lyr_close_btn.setObjectName("closeBtn")
         lyr_close_btn.setFixedSize(36, 36)
         lyr_close_btn.clicked.connect(self.toggle_lyrics_view)

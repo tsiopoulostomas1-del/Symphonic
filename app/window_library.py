@@ -7,6 +7,7 @@ from PySide6.QtCore import QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QPixmap, QColor, QPainter, QPainterPath
 from app.services import fetch_artist_bio_from_lastfm
 from app.subsonic import SubsonicClient
+from app.translations import translate
 
 LASTFM_API_KEY = "6e7807c08e2b0515d717009115b12d42"
 
@@ -67,10 +68,10 @@ class MainWindowLibrary:
         song = self.songs_data[row]
         
         menu = QMenu()
-        play_next_action = menu.addAction("Play Next")
-        add_to_queue_action = menu.addAction("Add to Queue")
-        like_action = menu.addAction("Like Song")
-        add_to_playlist_action = menu.addAction("Add to Playlist")
+        play_next_action = menu.addAction(self.text("play_next"))
+        add_to_queue_action = menu.addAction(self.text("add_to_queue"))
+        like_action = menu.addAction(self.text("like_song"))
+        add_to_playlist_action = menu.addAction(self.text("add_to_playlist"))
         
         action = menu.exec(self.songs_table.viewport().mapToGlobal(pos))
         
@@ -90,7 +91,7 @@ class MainWindowLibrary:
         if not item: return
         
         menu = QMenu()
-        go_to_artist_action = menu.addAction("Go to Artist")
+        go_to_artist_action = menu.addAction(self.text("go_to_artist"))
         
         action = menu.exec(self.artists_list.viewport().mapToGlobal(pos))
         
@@ -98,29 +99,44 @@ class MainWindowLibrary:
             self.open_artist_details(item.data(Qt.UserRole), item.text())
     def prompt_add_to_playlist(self, song_id):
         if not self.current_playlists:
-            QMessageBox.warning(self, "No Playlists", "You don't have any playlists.")
+            QMessageBox.warning(
+                self, self.text("no_playlists_title"), self.text("no_playlists")
+            )
             return
             
         playlist_names = [p["name"] for p in self.current_playlists]
-        name, ok = QInputDialog.getItem(self, "Add to Playlist", "Select Playlist:", playlist_names, 0, False)
+        name, ok = QInputDialog.getItem(
+            self,
+            self.text("add_to_playlist"),
+            self.text("select_playlist"),
+            playlist_names,
+            0,
+            False,
+        )
         
         if ok and name:
             for p in self.current_playlists:
                 if p["name"] == name:
                     self.client.update_playlist(p["id"], song_id_to_add=song_id)
-                    QMessageBox.information(self, "Success", f"Added to {name}")
+                    QMessageBox.information(
+                        self,
+                        self.text("success"),
+                        self.text("added_to_playlist", name=name),
+                    )
                     break
     def open_liked_songs(self):
         if not self.client:
             QMessageBox.information(
-                self, "Not Connected", "Connect to your Navidrome server in Settings first."
+                self, self.text("not_connected"), self.text("connect_settings")
             )
             self.open_settings()
             return
 
         self.switch_view(7)
-        self.pd_type.setText("COLLECTION")
-        self.pd_title.setText("Liked Songs")
+        self.showing_liked_songs = True
+        self.current_playlist_id = None
+        self.pd_type.setText(self.text("collection"))
+        self.pd_title.setText(self.text("liked_songs"))
         self.pd_icon.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #4f46e5, stop:1 #00E5FF); border-radius: 10px; font-size: 60px; color: white;")
         self.pd_icon.setText("♥")
         self.pd_icon.setAlignment(Qt.AlignCenter)
@@ -131,21 +147,27 @@ class MainWindowLibrary:
             return
 
         self.liked_songs_data = self.client.get_starred_songs()
-        self.pd_meta.setText(f"{len(self.liked_songs_data)} songs")
+        self.pd_meta.setText(
+            self.text("songs_count", count=len(self.liked_songs_data))
+        )
         
         self.pd_table.setRowCount(0)
         self.pd_table.setRowCount(len(self.liked_songs_data))
         
         for row, song in enumerate(self.liked_songs_data):
             self.pd_table.setItem(row, 0, QTableWidgetItem(str(row+1)))
-            self.pd_table.setItem(row, 1, QTableWidgetItem(song.get("title", "Unknown")))
-            self.pd_table.setItem(row, 2, QTableWidgetItem(song.get("artist", "Unknown")))
+            self.pd_table.setItem(
+                row, 1, QTableWidgetItem(song.get("title", self.text("unknown")))
+            )
+            self.pd_table.setItem(
+                row, 2, QTableWidgetItem(song.get("artist", self.text("unknown")))
+            )
             dur_str = QTime(0, 0).addSecs(song.get("duration", 0)).toString("m:ss")
             self.pd_table.setItem(row, 3, QTableWidgetItem(dur_str))
     def on_playlist_clicked(self, item):
         if not self.client:
             QMessageBox.information(
-                self, "Not Connected", "Connect to your Navidrome server in Settings first."
+                self, self.text("not_connected"), self.text("connect_settings")
             )
             self.open_settings()
             return
@@ -154,27 +176,38 @@ class MainWindowLibrary:
         playlist_name = item.text()
         
         self.switch_view(7)
+        self.showing_liked_songs = False
         self.current_playlist_id = playlist_id
-        self.pd_type.setText("PLAYLIST")
+        self.pd_type.setText(self.text("playlist").upper())
         self.pd_title.setText(playlist_name)
         self.pd_icon.setStyleSheet("background-color: #1A1F2B; border-radius: 10px;")
         self.pd_icon.setPixmap(QPixmap()) 
         
         self.current_playlist_songs = self.client.get_playlist_songs(playlist_id)
-        self.pd_meta.setText(f"{len(self.current_playlist_songs)} songs")
+        self.pd_meta.setText(
+            self.text("songs_count", count=len(self.current_playlist_songs))
+        )
         
         self.pd_table.setRowCount(0)
         self.pd_table.setRowCount(len(self.current_playlist_songs))
         
         for row, song in enumerate(self.current_playlist_songs):
             self.pd_table.setItem(row, 0, QTableWidgetItem(str(row+1)))
-            self.pd_table.setItem(row, 1, QTableWidgetItem(song.get("title", "Unknown")))
-            self.pd_table.setItem(row, 2, QTableWidgetItem(song.get("artist", "Unknown")))
+            self.pd_table.setItem(
+                row, 1, QTableWidgetItem(song.get("title", self.text("unknown")))
+            )
+            self.pd_table.setItem(
+                row, 2, QTableWidgetItem(song.get("artist", self.text("unknown")))
+            )
             dur_str = QTime(0, 0).addSecs(song.get("duration", 0)).toString("m:ss")
             self.pd_table.setItem(row, 3, QTableWidgetItem(dur_str))
     def on_playlist_track_double_clicked(self, index):
         if self.content_stack.currentIndex() == 7:
-            songs = self.liked_songs_data if self.pd_title.text() == "Liked Songs" else self.current_playlist_songs
+            songs = (
+                self.liked_songs_data
+                if self.showing_liked_songs
+                else self.current_playlist_songs
+            )
             self.play_songs(songs, index.row())
     def toggle_like_current_song(self):
         if not self.current_song_id: return
@@ -182,10 +215,12 @@ class MainWindowLibrary:
         if self.btn_like.text() == "♡":
             self.client.star_song(self.current_song_id, True)
             self.btn_like.setText("♥")
+            self.btn_like.setToolTip(self.text("unlike"))
             self.btn_like.setStyleSheet("color: #00E5FF; font-size: 20px;")
         else:
             self.client.star_song(self.current_song_id, False)
             self.btn_like.setText("♡")
+            self.btn_like.setToolTip(self.text("like"))
             self.btn_like.setStyleSheet("color: #94A3B8; font-size: 20px;")
     def add_album_card(self, album, grid, row, col):
         card = QWidget()
@@ -201,7 +236,7 @@ class MainWindowLibrary:
         else:
             img_label.setFixedSize(160, 160)
         
-        title_label = QLabel(album.get("name", "Unknown"))
+        title_label = QLabel(album.get("name", self.text("unknown")))
         title_label.setWordWrap(True)
         title_label.setObjectName("albumTitle")
         
@@ -226,16 +261,18 @@ class MainWindowLibrary:
     def open_album_details(self, album):
         self.switch_view(5)
         self.current_album_id = album["id"]
-        self.ad_title.setText(album.get("name", "Unknown"))
-        self.ad_artist.setText(album.get("artist", "Unknown"))
+        self.ad_title.setText(album.get("name", self.text("unknown")))
+        self.ad_artist.setText(album.get("artist", self.text("unknown")))
         
         year = album.get("year", "")
         genre = album.get("genre", "")
         song_count = album.get("songCount", 0)
         meta_str = []
         if year: meta_str.append(str(year))
-        if genre: meta_str.append(genre)
-        if song_count: meta_str.append(f"{song_count} tracks")
+        if genre:
+            meta_str.append(genre)
+        if song_count:
+            meta_str.append(self.text("album_tracks_count", count=song_count))
         
         self.ad_meta.setText(" • ".join(meta_str))
         
@@ -257,7 +294,7 @@ class MainWindowLibrary:
         
         for row, song in enumerate(self.current_album_songs):
             track_num = str(song.get("track", row + 1))
-            title = song.get("title", "Unknown")
+            title = song.get("title", self.text("unknown"))
             dur_sec = song.get("duration", 0)
             dur_str = QTime(0, 0).addSecs(dur_sec).toString("m:ss")
             
@@ -276,7 +313,8 @@ class MainWindowLibrary:
             self.ad_table.setRowHeight(row, 36)
             like_button.setCursor(Qt.PointingHandCursor)
             like_button.setToolTip(
-                "Remove from liked songs" if song.get("starred") else "Like song"
+                self.text("like_remove") if song.get("starred")
+                else self.text("like")
             )
             like_button.clicked.connect(
                 lambda checked, song_row=row:
@@ -298,7 +336,7 @@ class MainWindowLibrary:
             button = self.ad_table.cellWidget(row, 3)
             if button:
                 button.setChecked(bool(song.get("starred")))
-            QMessageBox.warning(self, "Like Song Failed", str(exc))
+            QMessageBox.warning(self, self.text("like_failed"), str(exc))
             return
 
         if should_star:
@@ -326,6 +364,9 @@ class MainWindowLibrary:
                 ]
             if song_id == self.current_song_id:
                 self.btn_like.setText("♥" if should_star else "♡")
+                self.btn_like.setToolTip(
+                    self.text("unlike") if should_star else self.text("like")
+                )
                 self.btn_like.setStyleSheet(
                     "color: #00E5FF; font-size: 20px;"
                     if should_star
@@ -340,7 +381,10 @@ class MainWindowLibrary:
             button.style().unpolish(button)
             button.style().polish(button)
             button.setToolTip(
-                "Remove from liked songs" if should_star else "Like song"
+                translate(
+                    getattr(self, "language", "en"),
+                    "like_remove" if should_star else "like",
+                )
             )
     def on_ad_art_downloaded(self, data, album_id):
         if album_id != self.current_album_id:
@@ -373,7 +417,7 @@ class MainWindowLibrary:
         self.current_artist_id = artist_id
         self.current_artist_name = artist_name
         self.art_name.setText(artist_name)
-        self.art_bio.setText("Loading artist details...")
+        self.art_bio.setText(self.text("loading_artist"))
         self.art_image.clear()
         
         for i in reversed(range(self.artist_albums_grid.count())): 
@@ -400,7 +444,7 @@ class MainWindowLibrary:
         ):
             return
 
-        self.art_bio.setText(bio if bio else "No biography available.")
+        self.art_bio.setText(bio if bio else self.text("no_biography"))
         cover_id = artist_info.get("coverArt")
         if cover_id:
             self.load_cover_art(
@@ -427,8 +471,8 @@ class MainWindowLibrary:
             or artist_id != self.current_artist_id
         ):
             return
-        self.art_bio.setText("Could not load artist details.")
-        QMessageBox.warning(self, "Artist Load Failed", message)
+        self.art_bio.setText(self.text("artist_details_error"))
+        QMessageBox.warning(self, self.text("artist_load_failed"), message)
     def on_artist_art_downloaded(self, data, artist_id):
         if artist_id != self.current_artist_id:
             return
@@ -461,14 +505,20 @@ class MainWindowLibrary:
         self.songs_table.setRowCount(0)
         self.songs_table.setRowCount(len(songs))
         for row, song in enumerate(songs):
-            item_title = QTableWidgetItem(song.get("title", "Unknown"))
+            item_title = QTableWidgetItem(song.get("title", self.text("unknown")))
             if song.get("id") == self.current_song_id:
                 item_title.setForeground(QColor("#00E5FF"))
-                item_title.setText(f"▶ {song.get('title', 'Unknown')}")
+                item_title.setText(
+                    f"▶ {song.get('title', self.text('unknown'))}"
+                )
             
             self.songs_table.setItem(row, 0, item_title)
-            self.songs_table.setItem(row, 1, QTableWidgetItem(song.get("artist", "Unknown")))
-            self.songs_table.setItem(row, 2, QTableWidgetItem(song.get("album", "Unknown")))
+            self.songs_table.setItem(
+                row, 1, QTableWidgetItem(song.get("artist", self.text("unknown")))
+            )
+            self.songs_table.setItem(
+                row, 2, QTableWidgetItem(song.get("album", self.text("unknown")))
+            )
             dur_sec = song.get("duration", 0)
             self.songs_table.setItem(row, 3, QTableWidgetItem(QTime(0, 0).addSecs(dur_sec).toString("m:ss")))
     def on_album_art_downloaded(self, data, label):
@@ -505,7 +555,7 @@ class MainWindowLibrary:
         request_id = self.search_request_id
         self.search_results_data = []
         self.search_results_list.clear()
-        self.search_results_list.addItem("Searching...")
+        self.search_results_list.addItem(self.text("searching"))
         self.switch_view(4)
         loader = SearchLoader(request_id, self.client, query)
         loader.loaded.connect(self.on_search_loaded)
@@ -522,8 +572,8 @@ class MainWindowLibrary:
         self.search_results_list.clear()
         for song in songs:
             item = QListWidgetItem(
-                f"{song.get('title', 'Unknown')}    —    "
-                f"{song.get('artist', 'Unknown')}"
+                f"{song.get('title', self.text('unknown'))}    —    "
+                f"{song.get('artist', self.text('unknown'))}"
             )
             item.setData(Qt.UserRole, song)
             self.search_results_list.addItem(item)
@@ -535,8 +585,8 @@ class MainWindowLibrary:
             return
         self.search_results_data = []
         self.search_results_list.clear()
-        self.search_results_list.addItem("Search failed.")
-        QMessageBox.warning(self, "Search Failed", message)
+        self.search_results_list.addItem(self.text("search_failed"))
+        QMessageBox.warning(self, self.text("search_failed_title"), message)
         self.switch_view(4)
     def animate_album_click(self, widget, on_finished=None):
         rect = widget.geometry()

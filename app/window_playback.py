@@ -81,10 +81,10 @@ class MainWindowPlayback:
         info_layout = QVBoxLayout()
         info_layout.setSpacing(2)
         info_layout.setAlignment(Qt.AlignVCenter)
-        self.np_title = QLabel("Not Playing")
+        self.np_title = QLabel(self.text("not_playing"))
         self.np_title.setObjectName("npTitle")
         
-        self.np_artist = QPushButton("Select a track")
+        self.np_artist = QPushButton(self.text("select_track"))
         self.np_artist.setObjectName("npArtistBtn")
         self.np_artist.setCursor(Qt.PointingHandCursor)
         self.np_artist.clicked.connect(self.open_current_artist)
@@ -96,12 +96,14 @@ class MainWindowPlayback:
         
         self.btn_like = QPushButton("♡")
         self.btn_like.setObjectName("likeBtn")
+        self.btn_like.setToolTip(self.text("like"))
         self.btn_like.setCursor(Qt.PointingHandCursor)
         self.btn_like.clicked.connect(self.toggle_like_current_song)
         left_layout.addWidget(self.btn_like)
         
         self.btn_lyrics = QPushButton("🎙️")
         self.btn_lyrics.setObjectName("likeBtn") 
+        self.btn_lyrics.setToolTip(self.text("lyrics"))
         self.btn_lyrics.setCursor(Qt.PointingHandCursor)
         self.btn_lyrics.clicked.connect(self.toggle_lyrics_view)
         left_layout.addWidget(self.btn_lyrics)
@@ -123,6 +125,11 @@ class MainWindowPlayback:
         self.btn_play = QPushButton("▶")
         self.btn_next = QPushButton("▶▶")
         self.btn_repeat = QPushButton("⟲ / RPT")
+        self.btn_shuffle.setToolTip(self.text("shuffle"))
+        self.btn_prev.setToolTip(self.text("previous"))
+        self.btn_play.setToolTip(self.text("play"))
+        self.btn_next.setToolTip(self.text("next"))
+        self.btn_repeat.setToolTip(self.text("repeat"))
         
         for btn in [self.btn_shuffle, self.btn_prev, self.btn_play, self.btn_next, self.btn_repeat]:
             btn.setCursor(Qt.PointingHandCursor)
@@ -172,9 +179,9 @@ class MainWindowPlayback:
         right_layout.setSpacing(10)
         right_layout.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        vol_label = QLabel("VOL")
-        vol_label.setObjectName("smallCtrlBtn")
-        right_layout.addWidget(vol_label)
+        self.volume_label = QLabel(self.text("volume"))
+        self.volume_label.setObjectName("smallCtrlBtn")
+        right_layout.addWidget(self.volume_label)
         
         self.volume_slider = QSlider(Qt.Horizontal)
         self.volume_slider.setObjectName("volumeBar")
@@ -197,14 +204,22 @@ class MainWindowPlayback:
             song = item["song_data"]
             
             if row == self.player.current_index:
-                item_title = QTableWidgetItem(f"▶ {song.get('title', 'Unknown')}")
+                item_title = QTableWidgetItem(
+                    f"▶ {song.get('title', self.text('unknown'))}"
+                )
                 item_title.setForeground(QColor("#00E5FF"))
             else:
-                item_title = QTableWidgetItem(song.get('title', 'Unknown'))
+                item_title = QTableWidgetItem(
+                    song.get("title", self.text("unknown"))
+                )
                 
             self.queue_table.setItem(row, 0, item_title)
-            self.queue_table.setItem(row, 1, QTableWidgetItem(song.get("artist", "Unknown")))
-            self.queue_table.setItem(row, 2, QTableWidgetItem(song.get("album", "Unknown")))
+            self.queue_table.setItem(
+                row, 1, QTableWidgetItem(song.get("artist", self.text("unknown")))
+            )
+            self.queue_table.setItem(
+                row, 2, QTableWidgetItem(song.get("album", self.text("unknown")))
+            )
     def on_queue_table_double_clicked(self, index):
         self.player.play_index(index.row())
     def toggle_lyrics_view(self):
@@ -257,7 +272,7 @@ class MainWindowPlayback:
         self.lyric_labels = []
         self.current_lyric_index = -1
         
-        loading_lbl = QLabel("Searching for lyrics...")
+        loading_lbl = QLabel(self.text("loading_lyrics"))
         loading_lbl.setObjectName("lyricsText")
         loading_lbl.setStyleSheet("color: #94A3B8; font-size: 24px;")
         self.lyrics_container_layout.addWidget(loading_lbl)
@@ -287,7 +302,7 @@ class MainWindowPlayback:
                 if line.strip():
                     self.lyrics_container_layout.addWidget(LyricLabel(line))
         else:
-            no_lyrics = QLabel("Lyrics currently unavailable. Please try again later.")
+            no_lyrics = QLabel(self.text("lyrics_unavailable"))
             no_lyrics.setObjectName("lyricsText")
             no_lyrics.setStyleSheet("color: #94A3B8; font-size: 20px;")
             self.lyrics_container_layout.addWidget(no_lyrics)
@@ -357,8 +372,8 @@ class MainWindowPlayback:
             song for song in self.recently_played if isinstance(song, dict)
         ][:20]
         for song in self.recently_played:
-            title = song.get("title", "Unknown")
-            artist = song.get("artist", "Unknown")
+            title = song.get("title", self.text("unknown"))
+            artist = song.get("artist", self.text("unknown"))
             item = QListWidgetItem(f"{title}    —    {artist}")
             item.setData(Qt.UserRole, song)
             self.recent_list.addItem(item)
@@ -403,7 +418,7 @@ class MainWindowPlayback:
         self.scrobbled_song_id = None
         self.last_playback_position = None
         self.listened_ms = 0
-        self.current_artist_name = song.get("artist", "Unknown")
+        self.current_artist_name = song.get("artist", self.text("unknown"))
         resume_position = self.player.pending_position
         self.recently_played = [
             item for item in self.recently_played
@@ -417,10 +432,10 @@ class MainWindowPlayback:
         self.populate_recently_played()
         self.update_resume_button()
         
-        self.np_title.setText(song.get("title", "Unknown"))
-        self.np_artist.setText(song.get("artist", "Unknown"))
-        self.big_title.setText(song.get("title", "Unknown"))
-        self.big_artist.setText(song.get("artist", "Unknown"))
+        self.np_title.setText(song.get("title", self.text("unknown")))
+        self.np_artist.setText(song.get("artist", self.text("unknown")))
+        self.big_title.setText(song.get("title", self.text("unknown")))
+        self.big_artist.setText(song.get("artist", self.text("unknown")))
 
         dur_sec = song.get("duration", 0)
         self.time_total.setText(QTime(0, 0).addSecs(dur_sec).toString("m:ss"))
@@ -428,9 +443,11 @@ class MainWindowPlayback:
 
         if song.get("starred"):
             self.btn_like.setText("♥")
+            self.btn_like.setToolTip(self.text("unlike"))
             self.btn_like.setStyleSheet("color: #00E5FF; font-size: 20px;")
         else:
             self.btn_like.setText("♡")
+            self.btn_like.setToolTip(self.text("like"))
             self.btn_like.setStyleSheet("color: #94A3B8; font-size: 20px;")
             
         if self.lyrics_overlay.isVisible():
@@ -520,5 +537,10 @@ class MainWindowPlayback:
         self.big_seek.setRange(0, duration)
     def update_play_buttons(self, state):
         self.btn_play.setText("❚❚" if state == QMediaPlayer.PlayingState else "▶")
+        self.btn_play.setToolTip(
+            self.text("pause")
+            if state == QMediaPlayer.PlayingState
+            else self.text("play")
+        )
         if self.taskbar_controls:
             self.taskbar_controls.set_playing(state == QMediaPlayer.PlayingState)

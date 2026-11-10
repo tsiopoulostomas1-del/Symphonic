@@ -4,7 +4,7 @@ import os
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QListWidgetItem, QLabel,
-    QGraphicsOpacityEffect,
+    QPushButton, QGraphicsOpacityEffect,
 )
 from PySide6.QtCore import (
     Qt, QEvent, QRect, QUrl, QPropertyAnimation, QEasingCurve, QTimer,
@@ -19,6 +19,7 @@ from app.artwork_cache import ArtworkCache
 from app.player import Player
 from app.subsonic import SubsonicClient
 from app.settings import load_settings
+from app.translations import translate
 from app.widgets.settings_dialog import SettingsDialog
 from app.window_ui import MainWindowUI
 from app.window_library import MainWindowLibrary
@@ -34,43 +35,49 @@ class LibraryLoader(QThread):
     failed = Signal(int, object, str)
     progress = Signal(int, str)
 
-    def __init__(self, request_id, client):
+    def __init__(self, request_id, client, language="en"):
         super().__init__()
         self.request_id = request_id
         self.client = client
+        self.language = language
+
+    def text(self, key, **values):
+        return translate(self.language, key, **values)
 
     def run(self):
-        stage = "server connection"
+        stage = self.text("server_connection")
         try:
-            self.progress.emit(self.request_id, "Checking server...")
+            self.progress.emit(self.request_id, self.text("checking_server"))
             if not self.client.ping():
                 raise ConnectionError(
-                    self.client.ping_error or "Could not connect to the Navidrome server."
+                    self.client.ping_error or self.text("could_not_connect_server")
                 )
 
-            stage = "albums"
-            self.progress.emit(self.request_id, "Loading albums...")
+            stage = self.text("albums")
+            self.progress.emit(self.request_id, self.text("loading_albums"))
             albums = self.client.get_albums()
             self.loaded.emit(self.request_id, self.client, {"albums": albums})
 
-            stage = "artists"
-            self.progress.emit(self.request_id, "Loading artists...")
+            stage = self.text("artists")
+            self.progress.emit(self.request_id, self.text("loading_artists"))
             artists = self.client.get_artists()
             self.loaded.emit(self.request_id, self.client, {"artists": artists})
 
-            stage = "songs"
-            self.progress.emit(self.request_id, "Loading songs...")
+            stage = self.text("songs")
+            self.progress.emit(self.request_id, self.text("loading_songs"))
             songs = self.client.get_all_songs(
                 albums,
                 progress_callback=lambda current, total: self.progress.emit(
                     self.request_id,
-                    f"Loading songs ({current}/{total} albums)...",
+                    self.text(
+                        "loading_songs_progress", current=current, total=total
+                    ),
                 ),
             )
             self.loaded.emit(self.request_id, self.client, {"songs": songs})
 
-            stage = "playlists"
-            self.progress.emit(self.request_id, "Loading playlists...")
+            stage = self.text("playlists")
+            self.progress.emit(self.request_id, self.text("loading_playlists"))
             playlists = self.client.get_playlists()
             self.loaded.emit(
                 self.request_id, self.client, {"playlists": playlists}
@@ -78,7 +85,9 @@ class LibraryLoader(QThread):
             self.completed.emit(self.request_id, self.client)
         except Exception as exc:
             self.failed.emit(
-                self.request_id, self.client, f"{stage.title()} loading failed: {exc}"
+                self.request_id,
+                self.client,
+                self.text("library_stage_failed", stage=stage, error=exc),
             )
 
 
@@ -92,6 +101,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.artwork_cache = ArtworkCache()
         
         self.settings = load_settings()
+        self.language = self.settings.get("language", "en")
         self.app_state = load_app_state()
         self.recently_played = self.app_state.get("recently_played", [])
         if not isinstance(self.recently_played, list):
@@ -127,6 +137,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.current_playlists = []
         self.current_playlist_id = None
         self.current_playlist_songs = []
+        self.showing_liked_songs = False
         
         self.lyrics_lines = [] 
         self.current_lyric_index = -1
@@ -186,6 +197,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.playback_state_timer.timeout.connect(self.save_playback_state)
         self.playback_state_timer.start()
         self.setup_overlays()
+        self.retranslate_ui()
         QTimer.singleShot(0, self.setup_taskbar_controls)
         QTimer.singleShot(0, self.load_visible_album_art)
         QTimer.singleShot(0, self.load_all_data)
@@ -196,6 +208,110 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
                 self.player.media_player.playbackState()
                 == QMediaPlayer.PlayingState
             )
+
+    def text(self, key, **values):
+        return translate(self.language, key, **values)
+
+    def retranslate_ui(self):
+        self.setWindowTitle("Symphonic")
+        for button, key in (
+            (self.btn_nav_artists, "artists"),
+            (self.btn_nav_albums, "albums"),
+            (self.btn_nav_songs, "songs"),
+            (self.btn_nav_queue, "queue"),
+            (self.btn_nav_nowplaying, "now_playing"),
+            (self.btn_nav_recent, "recently_played"),
+            (self.btn_liked_songs, "liked_songs"),
+            (self.btn_nav_settings, "settings"),
+            (self.retry_library_button, "retry"),
+            (self.btn_play_album, "play_album"),
+            (self.resume_playback_button, "continue_listening"),
+        ):
+            button.setText(self.text(key))
+
+        self.playlist_label.setText(self.text("playlists"))
+        self.search_input.setPlaceholderText(self.text("search_library"))
+        self.page_title.setText(
+            self.text(
+                (
+                    "artists", "albums", "songs", "queue", "search_results",
+                    "album_details", "artist_details", "playlist",
+                    "recently_played",
+                )[self.content_stack.currentIndex()]
+            )
+        )
+        self.songs_table.setHorizontalHeaderLabels([
+            self.text("title"), self.text("artist"), self.text("album"),
+            self.text("time"),
+        ])
+        self.queue_table.setHorizontalHeaderLabels([
+            self.text("title"), self.text("artist"), self.text("album"),
+        ])
+        self.ad_table.setHorizontalHeaderLabels([
+            self.text("track_number"), self.text("title"), self.text("time"), "",
+        ])
+        self.pd_table.setHorizontalHeaderLabels([
+            self.text("track_number"), self.text("title"), self.text("artist"),
+            self.text("time"),
+        ])
+        self.disc_title.setText(self.text("discography"))
+        if self.showing_liked_songs and self.content_stack.currentIndex() == 7:
+            self.pd_type.setText(self.text("collection"))
+            self.pd_title.setText(self.text("liked_songs"))
+            self.pd_meta.setText(
+                self.text("songs_count", count=len(self.liked_songs_data))
+            )
+        elif self.content_stack.currentIndex() == 7:
+            self.pd_type.setText(self.text("playlist").upper())
+            self.pd_meta.setText(
+                self.text("songs_count", count=len(self.current_playlist_songs))
+            )
+
+        current_song = next(
+            (
+                item["song_data"]
+                for item in self.player.queue
+                if item["song_data"].get("id") == self.current_song_id
+            ),
+            None,
+        )
+        if current_song:
+            title = current_song.get("title", self.text("unknown"))
+            artist = current_song.get("artist", self.text("unknown"))
+            self.np_title.setText(title)
+            self.np_artist.setText(artist)
+            self.big_title.setText(title)
+            self.big_artist.setText(artist)
+        else:
+            self.np_title.setText(self.text("not_playing"))
+            self.np_artist.setText(self.text("select_track"))
+            self.big_title.setText(self.text("not_playing"))
+
+        self.btn_like.setToolTip(
+            self.text("unlike") if self.btn_like.text() == "♥"
+            else self.text("like")
+        )
+        self.btn_lyrics.setToolTip(self.text("lyrics"))
+        self.btn_shuffle.setToolTip(self.text("shuffle"))
+        self.btn_prev.setToolTip(self.text("previous"))
+        self.btn_next.setToolTip(self.text("next"))
+        self.btn_repeat.setToolTip(self.text("repeat"))
+        for close_button in (
+            self.now_playing_overlay.findChild(QPushButton),
+            self.lyrics_overlay.findChild(QPushButton),
+        ):
+            if close_button:
+                close_button.setToolTip(self.text("close"))
+        if self.player.media_player.playbackState() == QMediaPlayer.PlayingState:
+            self.btn_play.setToolTip(self.text("pause"))
+        else:
+            self.btn_play.setToolTip(self.text("play"))
+        self.populate_recently_played()
+        self.volume_label.setText(self.text("volume"))
+        if self.songs_data:
+            self.populate_songs_table(self.songs_data)
+        self.populate_queue_table()
+        self.update_resume_button()
 
     def eventFilter(self, obj, event):
         # ONLY trigger the hover logic if the lyrics overlay is currently visible!
@@ -246,11 +362,11 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
     def switch_view(self, index):
         previous_index = self.content_stack.currentIndex()
         self.content_stack.setCurrentIndex(index)
-        titles = [
-            "Artists", "Albums", "Songs", "Queue", "Search Results",
-            "Album Details", "Artist Details", "Playlist", "Recently Played",
+        title_keys = [
+            "artists", "albums", "songs", "queue", "search_results",
+            "album_details", "artist_details", "playlist", "recently_played",
         ]
-        self.page_title.setText(titles[index])
+        self.page_title.setText(self.text(title_keys[index]))
         if index in (0, 1, 2, 3, 8):
             self.app_state["last_view"] = index
             self.save_current_app_state()
@@ -300,6 +416,8 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         dialog = SettingsDialog(self.settings, self)
         if dialog.exec():
             self.settings = load_settings()
+            self.language = self.settings.get("language", "en")
+            self.retranslate_ui()
             self.sync_state_server()
             self.client = SubsonicClient(self.settings["server"], self.settings["username"], self.settings["password"])
             self.songs_data = []
@@ -317,19 +435,19 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
     def load_all_data(self):
         if not self.client:
             self.library_progress.hide()
-            self.library_status.setText("Not connected. Configure a server in Settings.")
+            self.library_status.setText(self.text("not_connected_setup"))
             self.open_settings()
             return
 
         self.library_load_id += 1
         load_id = self.library_load_id
         client = self.client
-        worker = LibraryLoader(load_id, client)
+        worker = LibraryLoader(load_id, client, self.language)
         worker.loaded.connect(self.on_library_loaded)
         worker.completed.connect(self.on_library_load_completed)
         worker.failed.connect(self.on_library_load_failed)
         worker.progress.connect(self.on_library_load_progress)
-        self.library_status.setText("Connecting...")
+        self.library_status.setText(self.text("connecting"))
         self.library_progress.show()
         self.retry_library_button.hide()
         self.keep_background_worker(worker)
@@ -355,7 +473,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             self.artists_data = data["artists"]
             self.artists_list.clear()
             for artist in self.artists_data:
-                item = QListWidgetItem(artist.get("name", "Unknown"))
+                item = QListWidgetItem(artist.get("name", self.text("unknown")))
                 item.setData(Qt.UserRole, artist.get("id"))
                 self.artists_list.addItem(item)
 
@@ -378,21 +496,21 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             self.current_playlists = data["playlists"]
             self.playlists_list.clear()
             for playlist in self.current_playlists:
-                item = QListWidgetItem(playlist["name"])
+                item = QListWidgetItem(playlist.get("name", self.text("unknown")))
                 item.setData(Qt.UserRole, playlist["id"])
                 self.playlists_list.addItem(item)
 
         if "albums" in data:
             self.library_status.setText(
-                f"Loaded {len(self.albums_data)} albums; loading library..."
+                self.text("loaded_albums", count=len(self.albums_data))
             )
         elif "artists" in data:
             self.library_status.setText(
-                f"Loaded {len(self.artists_data)} artists; loading songs..."
+                self.text("loaded_artists", count=len(self.artists_data))
             )
         elif "songs" in data:
             self.library_status.setText(
-                f"Loaded {len(self.songs_data)} songs; loading playlists..."
+                self.text("loaded_songs", count=len(self.songs_data))
             )
 
     @Slot(int, object)
@@ -404,7 +522,12 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         artist_count = len(self.artists_data)
         album_count = len(self.albums_data)
         self.library_status.setText(
-            f"Loaded {song_count} songs, {artist_count} artists, {album_count} albums"
+            self.text(
+                "loaded_library",
+                songs=song_count,
+                artists=artist_count,
+                albums=album_count,
+            )
         )
         self.library_progress.hide()
         self.retry_library_button.hide()
@@ -416,10 +539,8 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         if not song_count and not artist_count and not album_count:
             QMessageBox.information(
                 self,
-                "Library Is Empty",
-                "The server connected successfully but returned no songs, artists, "
-                "or albums. Check that the library is scanned and that this account "
-                "has permission to access it.",
+                self.text("empty_library_title"),
+                self.text("empty_library_message"),
             )
     @Slot(int, str)
     def on_library_load_progress(self, request_id, message):
@@ -431,9 +552,8 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             return
         self.library_progress.hide()
         self.retry_library_button.show()
-        stage = message.partition(" loading failed:")[0]
-        self.library_status.setText(f"Library load failed during {stage.lower()}")
-        QMessageBox.warning(self, "Library Load Failed", message)
+        self.library_status.setText(self.text("library_load_failed_status"))
+        QMessageBox.warning(self, self.text("library_load_failed"), message)
 
     def load_cover_art(self, cover_id, size, callback):
         if not cover_id or not self.client:
@@ -552,11 +672,11 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         song_exists = any(song.get("id") == song_id for song in self.songs_data)
         self.resume_playback_button.setEnabled(song_exists)
         if song_exists:
-            self.recent_status.setText("Continue where you left off, or choose a recent track.")
+            self.recent_status.setText(self.text("recent_resume"))
         elif self.recently_played:
-            self.recent_status.setText("Choose a recently played track to start listening.")
+            self.recent_status.setText(self.text("recent_choose"))
         else:
-            self.recent_status.setText("Your recently played tracks will appear here.")
+            self.recent_status.setText(self.text("recent_empty"))
 
     def closeEvent(self, event):
         self.save_playback_state()
