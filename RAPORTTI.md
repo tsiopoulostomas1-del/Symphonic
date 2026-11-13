@@ -187,3 +187,19 @@ Tänään on enimmäkseen suunniteltu seuraavia vaiheita ja opeteltu ja luettu k
     OSA 9
 
     Lisätty muutama kieli vielä lisää kuten ranska, hollanti, kreikka, unkari yms.
+
+### 13.11.2026
+
+    OSA 10
+
+    Lisätty muutama teema sovellukseen "UI Settings" valikkoon
+
+        - Ember
+
+        - Violet
+
+        - Midnight Cyan
+
+        -  Soft Light
+
+    Sovellukselle lisätty myös logo jota tullaan vielä korjailemaan graafisesti.

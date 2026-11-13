@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import ctypes
+import tempfile
 from ctypes import wintypes
 
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".symphonic")
@@ -79,11 +80,13 @@ def load_settings() -> dict:
                 "username": "",
                 "password": "",
                 "language": "en",
+                "theme": "midnight",
             }
         stored_password = settings.get("password", "")
         settings["password"] = _unprotect_windows_password(stored_password)
 
         settings.setdefault("language", "en")
+        settings.setdefault("theme", "midnight")
 
         if os.name == "nt" and not stored_password.startswith(ENCRYPTED_PASSWORD_PREFIX):
             save_settings(
@@ -91,16 +94,24 @@ def load_settings() -> dict:
                 settings.get("username", ""),
                 settings["password"],
                 settings["language"],
+                settings["theme"],
             )
         return settings
 
     return {"server": "",
             "username": "",
             "password": "",
-            "language": "en"}
+            "language": "en",
+            "theme": "midnight"}
 
 
-def save_settings(server: str, username: str, password: str, language: str = "en"):
+def save_settings(
+    server: str,
+    username: str,
+    password: str,
+    language: str = "en",
+    theme: str = "midnight",
+):
     if not os.path.exists(CONFIG_DIR):
         os.makedirs(CONFIG_DIR)
     with open(CONFIG_FILE, "w") as f:
@@ -110,6 +121,41 @@ def save_settings(server: str, username: str, password: str, language: str = "en
                 "username": username,
                 "password": _protect_windows_password(password),
                 "language": language,
+                "theme": theme,
             },
             f,
         )
+
+
+def save_theme(theme: str) -> None:
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r", encoding="utf-8") as settings_file:
+            settings = json.load(settings_file)
+        if not isinstance(settings, dict):
+            raise ValueError("The settings file must contain a JSON object.")
+    else:
+        settings = {
+            "server": "",
+            "username": "",
+            "password": "",
+            "language": "en",
+        }
+
+    settings["theme"] = theme
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=CONFIG_DIR,
+            suffix=".tmp",
+            delete=False,
+        ) as settings_file:
+            temporary_path = settings_file.name
+            json.dump(settings, settings_file)
+        os.replace(temporary_path, CONFIG_FILE)
+    except OSError:
+        if temporary_path and os.path.exists(temporary_path):
+            os.unlink(temporary_path)
+        raise

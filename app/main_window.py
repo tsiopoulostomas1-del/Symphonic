@@ -3,7 +3,7 @@ import os
 
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QMessageBox, QListWidgetItem, QLabel,
+    QApplication, QMainWindow, QMessageBox, QListWidgetItem, QLabel, QWidget,
     QPushButton, QGraphicsOpacityEffect,
 )
 from PySide6.QtCore import (
@@ -11,16 +11,19 @@ from PySide6.QtCore import (
     QThread, Signal, Slot,
 )
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QColor
 from shiboken6 import isValid
 
 from app.app_state import load_app_state, save_app_state
 from app.artwork_cache import ArtworkCache
+from app.branding import app_icon
 from app.player import Player
 from app.subsonic import SubsonicClient
-from app.settings import load_settings
+from app.settings import load_settings, save_theme
+from app.themes import THEMES, build_stylesheet
 from app.translations import translate
 from app.widgets.settings_dialog import SettingsDialog
+from app.widgets.ui_settings_dialog import UISettingsDialog
 from app.window_ui import MainWindowUI
 from app.window_library import MainWindowLibrary
 from app.window_playback import MainWindowPlayback
@@ -95,6 +98,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Symphonic")
+        self.setWindowIcon(app_icon())
         self.resize(1100, 750)
 
         self.network_manager = QNetworkAccessManager()
@@ -102,6 +106,9 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         
         self.settings = load_settings()
         self.language = self.settings.get("language", "en")
+        self.accent_color = THEMES.get(
+            self.settings.get("theme", "midnight"), THEMES["midnight"]
+        )["accent"]
         self.app_state = load_app_state()
         self.recently_played = self.app_state.get("recently_played", [])
         if not isinstance(self.recently_played, list):
@@ -223,6 +230,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             (self.btn_nav_recent, "recently_played"),
             (self.btn_liked_songs, "liked_songs"),
             (self.btn_nav_settings, "settings"),
+            (self.btn_ui_settings, "ui_settings"),
             (self.retry_library_button, "retry"),
             (self.btn_play_album, "play_album"),
             (self.resume_playback_button, "continue_listening"),
@@ -279,11 +287,13 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             title = current_song.get("title", self.text("unknown"))
             artist = current_song.get("artist", self.text("unknown"))
             self.np_title.setText(title)
+            self.np_title.setToolTip(title)
             self.np_artist.setText(artist)
             self.big_title.setText(title)
             self.big_artist.setText(artist)
         else:
             self.np_title.setText(self.text("not_playing"))
+            self.np_title.setToolTip("")
             self.np_artist.setText(self.text("select_track"))
             self.big_title.setText(self.text("not_playing"))
 
@@ -408,10 +418,14 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             self.switch_view(2)
     def toggle_shuffle(self):
         active = self.player.toggle_shuffle()
-        self.btn_shuffle.setStyleSheet("color: #00E5FF;" if active else "color: #64748B;")
+        self.btn_shuffle.setStyleSheet(
+            f"color: {self.accent_color};" if active else "color: #64748B;"
+        )
     def toggle_repeat(self):
         active = self.player.toggle_repeat()
-        self.btn_repeat.setStyleSheet("color: #00E5FF;" if active else "color: #64748B;")
+        self.btn_repeat.setStyleSheet(
+            f"color: {self.accent_color};" if active else "color: #64748B;"
+        )
     def open_settings(self):
         dialog = SettingsDialog(self.settings, self)
         if dialog.exec():
@@ -432,6 +446,46 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
                 widget = self.albums_grid.itemAt(i).widget()
                 if widget: widget.setParent(None)
             self.load_all_data()
+
+    def open_ui_settings(self):
+        dialog = UISettingsDialog(
+            self.settings.get("theme", "midnight"),
+            self.language,
+            self,
+        )
+        if not dialog.exec():
+            return
+
+        theme = dialog.selected_theme
+        if theme not in THEMES:
+            return
+        try:
+            save_theme(theme)
+        except (OSError, ValueError) as error:
+            QMessageBox.critical(
+                self, self.text("error"), str(error)
+            )
+            return
+
+        self.settings["theme"] = theme
+        self.accent_color = THEMES[theme]["accent"]
+        application = QApplication.instance()
+        if application:
+            application.setStyleSheet(build_stylesheet(theme))
+        if self.btn_like.text() == "♥":
+            self.btn_like.setStyleSheet(
+                f"color: {self.accent_color}; font-size: 20px;"
+            )
+        self.btn_shuffle.setStyleSheet(
+            f"color: {self.accent_color};"
+            if self.player.is_shuffle else "color: #64748B;"
+        )
+        self.btn_repeat.setStyleSheet(
+            f"color: {self.accent_color};"
+            if self.player.is_repeat else "color: #64748B;"
+        )
+        self.populate_songs_table(self.songs_data)
+
     def load_all_data(self):
         if not self.client:
             self.library_progress.hide()

@@ -11,6 +11,7 @@ class SettingsDialog(QDialog):
     def __init__(self, current_settings, parent=None):
         super().__init__(parent)
         self.current_language = current_settings.get("language", "en")
+        self.current_theme = current_settings.get("theme", "midnight")
         if self.current_language not in LANGUAGE_NAMES:
             self.current_language = "en"
         self.setFixedSize(420, 400) # Slightly wider and taller
@@ -173,7 +174,9 @@ class SettingsDialog(QDialog):
         
         client = SubsonicClient(url, user, pwd)
         if client.ping():
-            save_settings(url, user, pwd, self.current_language)
+            save_settings(
+                url, user, pwd, self.current_language, self.current_theme
+            )
             self.accept()
         else:
             QMessageBox.critical(

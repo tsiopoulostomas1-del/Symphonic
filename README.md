@@ -21,6 +21,7 @@ vaihtoehto olemassa oleville Subsonic-asiakkaille.
 - Viimeksi kuunnellut kappaleet ja kuuntelukohdan palautus.
 - Kirjaston latauksen edistymisnäyttö ja uudelleenyritys yhteysvirheissä.
 - Viimeksi käytetty päänäkymä palautetaan sovelluksen käynnistyessä.
+- Valittavat käyttöliittymän väriteemat.
 - Windowsissa palvelimen salasana suojataan Windows DPAPI:lla; vanhat asetukset muunnetaan automaattisesti.
 - Käyttöliittymä on saatavilla englanniksi, suomeksi ja venäjäksi.
 

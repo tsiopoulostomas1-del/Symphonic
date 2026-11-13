@@ -78,6 +78,12 @@ class MainWindowUI:
         self.btn_nav_settings.setCursor(Qt.PointingHandCursor)
         self.btn_nav_settings.clicked.connect(self.open_settings)
         sidebar_layout.addWidget(self.btn_nav_settings)
+
+        self.btn_ui_settings = QPushButton(self.text("ui_settings"))
+        self.btn_ui_settings.setObjectName("navButton")
+        self.btn_ui_settings.setCursor(Qt.PointingHandCursor)
+        self.btn_ui_settings.clicked.connect(self.open_ui_settings)
+        sidebar_layout.addWidget(self.btn_ui_settings)
         
         top_layout.addWidget(sidebar)
 
@@ -233,6 +239,7 @@ class MainWindowUI:
         self.btn_play_album = QPushButton(self.text("play_album"))
         self.btn_play_album.setObjectName("adPlayBtn")
         self.btn_play_album.setFixedWidth(140)
+        self.btn_play_album.setFixedHeight(44)
         self.btn_play_album.setCursor(Qt.PointingHandCursor)
         self.btn_play_album.clicked.connect(self.play_current_album)
         

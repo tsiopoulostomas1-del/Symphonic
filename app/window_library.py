@@ -137,7 +137,11 @@ class MainWindowLibrary:
         self.current_playlist_id = None
         self.pd_type.setText(self.text("collection"))
         self.pd_title.setText(self.text("liked_songs"))
-        self.pd_icon.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #4f46e5, stop:1 #00E5FF); border-radius: 10px; font-size: 60px; color: white;")
+        self.pd_icon.setStyleSheet(
+            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+            f"stop:0 #4f46e5, stop:1 {self.accent_color}); "
+            "border-radius: 10px; font-size: 60px; color: white;"
+        )
         self.pd_icon.setText("♥")
         self.pd_icon.setAlignment(Qt.AlignCenter)
         
@@ -216,7 +220,9 @@ class MainWindowLibrary:
             self.client.star_song(self.current_song_id, True)
             self.btn_like.setText("♥")
             self.btn_like.setToolTip(self.text("unlike"))
-            self.btn_like.setStyleSheet("color: #00E5FF; font-size: 20px;")
+            self.btn_like.setStyleSheet(
+                f"color: {self.accent_color}; font-size: 20px;"
+            )
         else:
             self.client.star_song(self.current_song_id, False)
             self.btn_like.setText("♡")
@@ -368,7 +374,7 @@ class MainWindowLibrary:
                     self.text("unlike") if should_star else self.text("like")
                 )
                 self.btn_like.setStyleSheet(
-                    "color: #00E5FF; font-size: 20px;"
+                    f"color: {self.accent_color}; font-size: 20px;"
                     if should_star
                     else "color: #94A3B8; font-size: 20px;"
                 )
@@ -507,7 +513,7 @@ class MainWindowLibrary:
         for row, song in enumerate(songs):
             item_title = QTableWidgetItem(song.get("title", self.text("unknown")))
             if song.get("id") == self.current_song_id:
-                item_title.setForeground(QColor("#00E5FF"))
+                item_title.setForeground(QColor(self.accent_color))
                 item_title.setText(
                     f"▶ {song.get('title', self.text('unknown'))}"
                 )

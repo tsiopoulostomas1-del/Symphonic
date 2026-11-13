@@ -2,7 +2,7 @@ import re
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSlider,
-    QListWidgetItem,
+    QListWidgetItem, QSizePolicy,
     QTableWidgetItem,
 )
 from PySide6.QtCore import Qt, QTime, QTimer, QThread, Signal, Slot
@@ -66,7 +66,7 @@ class MainWindowPlayback:
         player_bar_layout.setSpacing(0)
 
         left_widget = QWidget()
-        left_widget.setFixedWidth(340) 
+        left_widget.setFixedWidth(460)
         left_layout = QHBoxLayout(left_widget)
         left_layout.setContentsMargins(24, 8, 0, 8) 
         left_layout.setSpacing(16)
@@ -83,6 +83,9 @@ class MainWindowPlayback:
         info_layout.setAlignment(Qt.AlignVCenter)
         self.np_title = QLabel(self.text("not_playing"))
         self.np_title.setObjectName("npTitle")
+        self.np_title.setWordWrap(True)
+        self.np_title.setMaximumHeight(38)
+        self.np_title.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         
         self.np_artist = QPushButton(self.text("select_track"))
         self.np_artist.setObjectName("npArtistBtn")
@@ -98,6 +101,7 @@ class MainWindowPlayback:
         self.btn_like.setObjectName("likeBtn")
         self.btn_like.setToolTip(self.text("like"))
         self.btn_like.setCursor(Qt.PointingHandCursor)
+        self.btn_like.setFixedWidth(36)
         self.btn_like.clicked.connect(self.toggle_like_current_song)
         left_layout.addWidget(self.btn_like)
         
@@ -105,6 +109,7 @@ class MainWindowPlayback:
         self.btn_lyrics.setObjectName("likeBtn") 
         self.btn_lyrics.setToolTip(self.text("lyrics"))
         self.btn_lyrics.setCursor(Qt.PointingHandCursor)
+        self.btn_lyrics.setFixedWidth(36)
         self.btn_lyrics.clicked.connect(self.toggle_lyrics_view)
         left_layout.addWidget(self.btn_lyrics)
         
@@ -173,7 +178,7 @@ class MainWindowPlayback:
         player_bar_layout.addWidget(center_widget, stretch=1)
 
         right_widget = QWidget()
-        right_widget.setFixedWidth(340) 
+        right_widget.setFixedWidth(220)
         right_layout = QHBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 8, 24, 8) 
         right_layout.setSpacing(10)
@@ -207,7 +212,7 @@ class MainWindowPlayback:
                 item_title = QTableWidgetItem(
                     f"▶ {song.get('title', self.text('unknown'))}"
                 )
-                item_title.setForeground(QColor("#00E5FF"))
+                item_title.setForeground(QColor(self.accent_color))
             else:
                 item_title = QTableWidgetItem(
                     song.get("title", self.text("unknown"))
@@ -345,7 +350,7 @@ class MainWindowPlayback:
                 lbl.setStyleSheet("color: #64748B; font-size: 20px; font-weight: bold; background: transparent; padding: 5px;")
                 
             active_lbl = self.lyric_labels[active_index]
-            active_lbl.setStyleSheet("color: #00E5FF; font-size: 26px; font-weight: 900; background: transparent; padding: 5px;")
+            active_lbl.setStyleSheet(f"color: {self.accent_color}; font-size: 26px; font-weight: 900; background: transparent; padding: 5px;")
             
             QTimer.singleShot(50, lambda: self.lyrics_scroll.ensureWidgetVisible(active_lbl, 50, 200))
     def resizeEvent(self, event):
@@ -433,6 +438,7 @@ class MainWindowPlayback:
         self.update_resume_button()
         
         self.np_title.setText(song.get("title", self.text("unknown")))
+        self.np_title.setToolTip(song.get("title", self.text("unknown")))
         self.np_artist.setText(song.get("artist", self.text("unknown")))
         self.big_title.setText(song.get("title", self.text("unknown")))
         self.big_artist.setText(song.get("artist", self.text("unknown")))
@@ -444,7 +450,9 @@ class MainWindowPlayback:
         if song.get("starred"):
             self.btn_like.setText("♥")
             self.btn_like.setToolTip(self.text("unlike"))
-            self.btn_like.setStyleSheet("color: #00E5FF; font-size: 20px;")
+            self.btn_like.setStyleSheet(
+                f"color: {self.accent_color}; font-size: 20px;"
+            )
         else:
             self.btn_like.setText("♡")
             self.btn_like.setToolTip(self.text("like"))
