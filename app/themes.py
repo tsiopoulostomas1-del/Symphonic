@@ -94,8 +94,13 @@ QHeaderView::section { background-color: #F4F6FA; color: #657286; }
 
 def build_stylesheet(theme: str = "midnight") -> str:
     theme_values = THEMES.get(theme, THEMES["midnight"])
-    stylesheet_path = Path(__file__).resolve().parent.parent / "style.qss"
+    app_dir = Path(__file__).resolve().parent
+    stylesheet_path = app_dir.parent / "style.qss"
     stylesheet = stylesheet_path.read_text(encoding="utf-8")
+    genre_arrow_path = str(app_dir / "img" / "chevron-down.svg").replace(
+        "\\", "/"
+    )
+    stylesheet = stylesheet.replace("__GENRE_ARROW__", genre_arrow_path)
 
     if theme == "light":
         for source, target in _LIGHT_COLORS.items():

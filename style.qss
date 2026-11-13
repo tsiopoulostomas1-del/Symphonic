@@ -112,6 +112,19 @@ QHeaderView::section {
     border: 2px solid #ffffff;
 }
 
+QComboBox#searchInput::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 30px;
+    border: none;
+    background: transparent;
+}
+QComboBox#searchInput::down-arrow {
+    image: url("__GENRE_ARROW__");
+    width: 12px;
+    height: 12px;
+}
+
 #contentStack {
     background: transparent;
     border: none;
@@ -164,22 +177,34 @@ QHeaderView::section {
 #smallCtrlBtn {
     background: transparent;
     border: none;
-    font-size: 11px;
+    font-size: 14px;
     font-weight: bold;
     color: #64748B;
-    padding: 4px;
+    padding: 2px;
 }
 #smallCtrlBtn:hover {
+    color: #FFFFFF;
+}
+
+#shuffleBtn {
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    font-weight: bold;
+    color: #64748B;
+    padding: 2px;
+}
+#shuffleBtn:hover {
     color: #FFFFFF;
 }
 
 #controlBtn {
     background: transparent;
     border: none;
-    font-size: 14px;
+    font-size: 17px;
     font-weight: bold;
     color: #94A3B8;
-    padding: 4px;
+    padding: 2px;
 }
 #controlBtn:hover {
     color: #FFFFFF;
@@ -188,14 +213,10 @@ QHeaderView::section {
 #playBtn {
     background-color: #FFFFFF;
     color: #000000;
-    border-radius: 18px; 
-    font-size: 14px;
-    min-width: 36px;
-    max-width: 36px;
-    min-height: 36px;
-    max-height: 36px;
+    border-radius: 12px;
+    font-size: 18px;
     padding: 0;
-    margin: 0 12px;
+    margin: 0 4px;
 }
 #playBtn:hover {
     background-color: #E2E8F0;
@@ -448,6 +469,7 @@ QMenu::item:selected {
     color: #64748B;
     font-size: 19px;
     padding: 0;
+    margin-bottom: 15px;
 }
 #albumTrackLikeBtn[liked="true"] {
     color: #00E5FF;

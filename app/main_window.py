@@ -1,10 +1,12 @@
 import logging
 import os
+import random
 
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QMessageBox, QListWidgetItem, QLabel, QWidget,
-    QPushButton, QGraphicsOpacityEffect,
+    QPushButton, QGraphicsOpacityEffect, QLineEdit, QTextEdit, QPlainTextEdit,
+    QAbstractSpinBox,
 )
 from PySide6.QtCore import (
     Qt, QEvent, QRect, QUrl, QPropertyAnimation, QEasingCurve, QTimer,
@@ -129,6 +131,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.artists_data = []
         self.albums_data = []
         self.current_song_id = None
+        self.playback_restored = False
         self.scrobbled_song_id = None
         self.last_playback_position = None
         self.listened_ms = 0
@@ -205,6 +208,9 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.playback_state_timer.start()
         self.setup_overlays()
         self.retranslate_ui()
+        application = QApplication.instance()
+        if application is not None:
+            application.installEventFilter(self)
         QTimer.singleShot(0, self.setup_taskbar_controls)
         QTimer.singleShot(0, self.load_visible_album_art)
         QTimer.singleShot(0, self.load_all_data)
@@ -236,6 +242,17 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             (self.resume_playback_button, "continue_listening"),
         ):
             button.setText(self.text(key))
+
+        self.shuffle_albums_button.setText(self.text("shuffle_albums"))
+        self.clear_genre_filter_button.setText(self.text("clear"))
+        selected_genre = self.genre_filter.currentText()
+        self.genre_filter.blockSignals(True)
+        self.genre_filter.setItemText(0, self.text("all_genres"))
+        if selected_genre:
+            selected_index = self.genre_filter.findText(selected_genre)
+            if selected_index >= 0:
+                self.genre_filter.setCurrentIndex(selected_index)
+        self.genre_filter.blockSignals(False)
 
         self.playlist_label.setText(self.text("playlists"))
         self.search_input.setPlaceholderText(self.text("search_library"))
@@ -323,7 +340,169 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.populate_queue_table()
         self.update_resume_button()
 
+    @staticmethod
+    def _album_key(item, is_album=False):
+        album_id = item.get("albumId")
+        if is_album and not album_id:
+            album_id = item.get("id")
+        if album_id:
+            return f"id:{album_id}"
+
+        album_name = item.get("albumName") or item.get("album") or item.get("name")
+        if isinstance(album_name, dict):
+            album_name = album_name.get("name", "")
+        artist = item.get("artist", "")
+        if isinstance(artist, dict):
+            artist = artist.get("name", "")
+        return f"name:{str(album_name).casefold()}|{str(artist).casefold()}"
+
+    @staticmethod
+    def _item_genres(item):
+        genres = set()
+        for field in ("genre", "genres"):
+            values = item.get(field, [])
+            if isinstance(values, (str, dict)):
+                values = [values]
+            elif not isinstance(values, (list, tuple, set)):
+                continue
+            for value in values:
+                if isinstance(value, dict):
+                    value = value.get("name", "")
+                if isinstance(value, str) and value.strip():
+                    genres.add(value.strip())
+        return genres
+
+    def update_album_genre_options(self):
+        genres = {}
+        for album in self.albums_data:
+            for genre in self._item_genres(album):
+                genres.setdefault(genre.casefold(), genre)
+        for song in self.songs_data:
+            for genre in self._item_genres(song):
+                genres.setdefault(genre.casefold(), genre)
+
+        selected_genre = self.genre_filter.currentText()
+        self.genre_filter.blockSignals(True)
+        self.genre_filter.clear()
+        self.genre_filter.addItem(self.text("all_genres"))
+        self.genre_filter.addItems(
+            sorted(genres.values(), key=str.casefold)
+        )
+        selected_index = self.genre_filter.findText(selected_genre)
+        if selected_index >= 0:
+            self.genre_filter.setCurrentIndex(selected_index)
+        self.genre_filter.blockSignals(False)
+
+    def filter_albums_by_genre(self, _index):
+        self.render_album_grid()
+
+    def render_album_grid(self):
+        if not hasattr(self, "albums_grid"):
+            return
+
+        selected_genre = (
+            self.genre_filter.currentText()
+            if hasattr(self, "genre_filter")
+            and self.genre_filter.currentIndex() > 0
+            else ""
+        )
+        song_genres = {}
+        for song in self.songs_data:
+            song_genres.setdefault(self._album_key(song), set()).update(
+                self._item_genres(song)
+            )
+
+        albums = [
+            album for album in self.albums_data
+            if not selected_genre
+            or selected_genre.casefold() in {
+                genre.casefold()
+                for genre in (
+                    self._item_genres(album)
+                    | song_genres.get(
+                        self._album_key(album, is_album=True), set()
+                    )
+                )
+            }
+        ]
+
+        while self.albums_grid.count():
+            item = self.albums_grid.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        for index, album in enumerate(albums):
+            self.add_album_card(
+                album,
+                self.albums_grid,
+                index // 5,
+                index % 5,
+            )
+        QTimer.singleShot(0, self.load_visible_album_art)
+
+    def shuffle_albums(self):
+        song_groups = {}
+        for song in self.songs_data:
+            if song.get("id"):
+                song_groups.setdefault(self._album_key(song), []).append(song)
+
+        selected_genre = (
+            self.genre_filter.currentText()
+            if self.genre_filter.currentIndex() > 0
+            else ""
+        )
+        songs = []
+        for album in self.albums_data:
+            album_songs = song_groups.get(
+                self._album_key(album, is_album=True), []
+            )
+            album_genres = self._item_genres(album)
+            for song in album_songs:
+                album_genres.update(self._item_genres(song))
+            if selected_genre and selected_genre.casefold() not in {
+                genre.casefold() for genre in album_genres
+            }:
+                continue
+            if album_songs:
+                songs.append(random.choice(album_songs))
+
+        if not songs:
+            QMessageBox.information(
+                self,
+                self.text("shuffle_albums"),
+                self.text("no_albums_to_shuffle"),
+            )
+            return
+
+        random.shuffle(songs)
+        self.player.is_shuffle = False
+        self.player.is_repeat = False
+        self.btn_shuffle.setStyleSheet("color: #64748B;")
+        self.btn_repeat.setStyleSheet("color: #64748B;")
+        self.play_songs(songs, 0)
+
     def eventFilter(self, obj, event):
+        if (
+            event.type() == QEvent.KeyPress
+            and event.key() in (Qt.Key_Left, Qt.Key_Right)
+            and isinstance(obj, QWidget)
+            and obj.window() is self
+        ):
+            focused = QApplication.focusWidget()
+            if not isinstance(
+                focused, (QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox)
+            ):
+                duration = self.player.media_player.duration()
+                if duration > 0:
+                    offset = -5000 if event.key() == Qt.Key_Left else 5000
+                    position = self.player.media_player.position()
+                    self.player.set_position(
+                        max(0, min(position + offset, duration))
+                    )
+                    event.accept()
+                    return True
+
         # ONLY trigger the hover logic if the lyrics overlay is currently visible!
         if self.lyrics_overlay.isVisible():
             if obj == self.hover_zone or obj == self.now_playing_bar:
@@ -370,7 +549,6 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.bar_anim.finished.connect(self.now_playing_bar.hide)
         self.bar_anim.start()
     def switch_view(self, index):
-        previous_index = self.content_stack.currentIndex()
         self.content_stack.setCurrentIndex(index)
         title_keys = [
             "artists", "albums", "songs", "queue", "search_results",
@@ -381,25 +559,24 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             self.app_state["last_view"] = index
             self.save_current_app_state()
 
-        if previous_index != index:
-            if self.view_transition_animation:
-                self.view_transition_animation.stop()
-                self.view_transition_animation.deleteLater()
-            self.view_transition_effect.setOpacity(0.82)
-            self.view_transition_animation = QPropertyAnimation(
-                self.view_transition_effect, b"opacity", self
-            )
-            self.view_transition_animation.finished.connect(
-                self.view_transition_animation.deleteLater
-            )
-            self.view_transition_animation.finished.connect(
-                lambda: setattr(self, "view_transition_animation", None)
-            )
-            self.view_transition_animation.setDuration(170)
-            self.view_transition_animation.setEasingCurve(QEasingCurve.OutCubic)
-            self.view_transition_animation.setStartValue(0.82)
-            self.view_transition_animation.setEndValue(1.0)
-            self.view_transition_animation.start()
+        if self.view_transition_animation:
+            self.view_transition_animation.stop()
+            self.view_transition_animation.deleteLater()
+        self.view_transition_effect.setOpacity(0.82)
+        self.view_transition_animation = QPropertyAnimation(
+            self.view_transition_effect, b"opacity", self
+        )
+        self.view_transition_animation.finished.connect(
+            self.view_transition_animation.deleteLater
+        )
+        self.view_transition_animation.finished.connect(
+            lambda: setattr(self, "view_transition_animation", None)
+        )
+        self.view_transition_animation.setDuration(170)
+        self.view_transition_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self.view_transition_animation.setStartValue(0.82)
+        self.view_transition_animation.setEndValue(1.0)
+        self.view_transition_animation.start()
         
         if index in [5, 6, 7]:
             self.btn_back.show()
@@ -522,6 +699,8 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         if "songs" in data:
             self.songs_data = data["songs"]
             self.populate_songs_table(self.songs_data)
+            self.update_album_genre_options()
+            self.render_album_grid()
 
         if "artists" in data:
             self.artists_data = data["artists"]
@@ -533,18 +712,8 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
 
         if "albums" in data:
             self.albums_data = data["albums"]
-            for i in reversed(range(self.albums_grid.count())):
-                widget = self.albums_grid.itemAt(i).widget()
-                if widget:
-                    widget.setParent(None)
-
-            row, col = 0, 0
-            for album in self.albums_data:
-                self.add_album_card(album, self.albums_grid, row, col)
-                col += 1
-                if col > 4:
-                    col = 0
-                    row += 1
+            self.update_album_genre_options()
+            self.render_album_grid()
                 
         if "playlists" in data:
             self.current_playlists = data["playlists"]
@@ -590,6 +759,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         last_view = self.app_state.get("last_view", 2)
         if last_view in (0, 1, 2, 3, 8):
             self.switch_view(last_view)
+        self.restore_last_playback()
         if not song_count and not artist_count and not album_count:
             QMessageBox.information(
                 self,
@@ -719,6 +889,12 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         if self.current_song_id and not self.player.pending_position:
             self.app_state["last_track_id"] = self.current_song_id
             self.app_state["last_position"] = self.player.media_player.position()
+        if hasattr(self, "volume_slider"):
+            self.app_state["volume"] = self.volume_slider.value()
+        self.save_current_app_state()
+
+    def save_volume_state(self, volume):
+        self.app_state["volume"] = volume
         self.save_current_app_state()
 
     def update_resume_button(self):
@@ -734,6 +910,9 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
 
     def closeEvent(self, event):
         self.save_playback_state()
+        application = QApplication.instance()
+        if application is not None:
+            application.removeEventFilter(self)
         if self.taskbar_controls:
             application = QApplication.instance()
             if application is not None:

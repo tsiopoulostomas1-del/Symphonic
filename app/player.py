@@ -78,6 +78,14 @@ class Player(QObject):
             self._play_with_fade(was_playing)
             self.track_changed.emit(item["song_data"])
 
+    def load_index_paused(self, index: int, start_position: int = 0):
+        if 0 <= index < len(self.queue):
+            self.current_index = index
+            item = self.queue[index]
+            self.pending_position = max(0, start_position)
+            self.media_player.setSource(QUrl(item["url"]))
+            self.track_changed.emit(item["song_data"])
+
     def toggle_play_pause(self):
         if self.media_player.playbackState() == QMediaPlayer.PlayingState:
             if self._pause_after_fade:

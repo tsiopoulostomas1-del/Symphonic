@@ -1,10 +1,11 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget,
-    QPushButton, QSlider, QStackedWidget, QGridLayout, QScrollArea,
+    QPushButton, QSlider, QStackedWidget, QGridLayout, QScrollArea, QComboBox,
     QTableWidget, QHeaderView, QLineEdit, QGraphicsOpacityEffect,
     QProgressBar,
 )
 from PySide6.QtCore import Qt, QPropertyAnimation, QTimer
+from app.widgets.seek_slider import ClickSeekSlider
 
 
 class MainWindowUI:
@@ -160,6 +161,31 @@ class MainWindowUI:
         self.albums_grid = QGridLayout(self.albums_grid_widget)
         self.albums_grid.setSpacing(20)
         self.albums_scroll.setWidget(self.albums_grid_widget)
+
+        album_controls = QHBoxLayout()
+        album_controls.setSpacing(10)
+        self.shuffle_albums_button = QPushButton(self.text("shuffle_albums"))
+        self.shuffle_albums_button.setObjectName("adPlayBtn")
+        self.shuffle_albums_button.setCursor(Qt.PointingHandCursor)
+        self.shuffle_albums_button.clicked.connect(self.shuffle_albums)
+        album_controls.addWidget(self.shuffle_albums_button)
+
+        self.genre_filter = QComboBox()
+        self.genre_filter.setObjectName("searchInput")
+        self.genre_filter.setFixedWidth(180)
+        self.genre_filter.addItem(self.text("all_genres"))
+        self.genre_filter.currentIndexChanged.connect(self.filter_albums_by_genre)
+        album_controls.addWidget(self.genre_filter)
+
+        self.clear_genre_filter_button = QPushButton(self.text("clear"))
+        self.clear_genre_filter_button.setObjectName("navButton")
+        self.clear_genre_filter_button.setCursor(Qt.PointingHandCursor)
+        self.clear_genre_filter_button.clicked.connect(
+            lambda: self.genre_filter.setCurrentIndex(0)
+        )
+        album_controls.addWidget(self.clear_genre_filter_button)
+        album_controls.addStretch()
+        albums_layout.addLayout(album_controls)
         albums_layout.addWidget(self.albums_scroll)
 
         # 2: Songs
@@ -449,12 +475,27 @@ class MainWindowUI:
         self.big_artist.setAlignment(Qt.AlignCenter)
         np_over_layout.addWidget(self.big_artist)
         
-        self.big_seek = QSlider(Qt.Horizontal)
+        big_seek_widget = QWidget()
+        big_seek_layout = QHBoxLayout(big_seek_widget)
+        big_seek_layout.setContentsMargins(0, 0, 0, 0)
+        big_seek_layout.setSpacing(10)
+
+        self.big_time_current = QLabel("0:00")
+        self.big_time_current.setObjectName("timeLabel")
+        big_seek_layout.addWidget(self.big_time_current)
+
+        self.big_seek = ClickSeekSlider(Qt.Horizontal)
         self.big_seek.setObjectName("seekBar")
         self.big_seek.setRange(0, 100)
         self.big_seek.setFixedWidth(400)
         self.big_seek.sliderMoved.connect(self.player.set_position)
-        np_over_layout.addWidget(self.big_seek, alignment=Qt.AlignCenter)
+        big_seek_layout.addWidget(self.big_seek)
+
+        self.big_time_total = QLabel("0:00")
+        self.big_time_total.setObjectName("timeLabel")
+        big_seek_layout.addWidget(self.big_time_total)
+
+        np_over_layout.addWidget(big_seek_widget, alignment=Qt.AlignCenter)
         
         np_over_layout.addStretch()
 

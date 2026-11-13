@@ -203,3 +203,7 @@ Tänään on enimmäkseen suunniteltu seuraavia vaiheita ja opeteltu ja luettu k
         -  Soft Light
 
     Sovellukselle lisätty myös logo jota tullaan vielä korjailemaan graafisesti.
+
+    OSA 11
+
+    Lisätty Shuffle albumeille, genre valikko, fixattu pikku bugeja, Korjailtu playbaarin emojikokoja, toimivuutta ja selkeyttä. 

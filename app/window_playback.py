@@ -10,6 +10,7 @@ from PySide6.QtGui import QPixmap, QColor, QPainter, QPainterPath, QFontMetrics
 from PySide6.QtMultimedia import QMediaPlayer
 
 from app.services import fetch_lyrics_from_lrclib, fetch_lyrics_from_lyrics_ovh
+from app.widgets.seek_slider import ClickSeekSlider
 
 
 class LyricLabel(QLabel):
@@ -122,7 +123,7 @@ class MainWindowPlayback:
         center_layout.setAlignment(Qt.AlignCenter)
 
         controls_layout = QHBoxLayout()
-        controls_layout.setSpacing(20)
+        controls_layout.setSpacing(14)
         controls_layout.setAlignment(Qt.AlignCenter)
         
         self.btn_shuffle = QPushButton("⤨")
@@ -140,11 +141,16 @@ class MainWindowPlayback:
             btn.setCursor(Qt.PointingHandCursor)
             controls_layout.addWidget(btn)
             
-        self.btn_shuffle.setObjectName("smallCtrlBtn")
+        self.btn_shuffle.setObjectName("shuffleBtn")
         self.btn_repeat.setObjectName("smallCtrlBtn")
         self.btn_prev.setObjectName("controlBtn")
         self.btn_next.setObjectName("controlBtn")
         self.btn_play.setObjectName("playBtn") 
+        self.btn_shuffle.setFixedSize(44, 40)
+        self.btn_repeat.setFixedSize(72, 40)
+        self.btn_prev.setFixedSize(44, 40)
+        self.btn_next.setFixedSize(44, 40)
+        self.btn_play.setFixedSize(48, 48)
         
         self.btn_play.clicked.connect(self.player.toggle_play_pause)
         self.btn_next.clicked.connect(self.player.next)
@@ -161,7 +167,7 @@ class MainWindowPlayback:
         self.time_current = QLabel("0:00")
         self.time_current.setObjectName("timeLabel")
         
-        self.seek_bar = QSlider(Qt.Horizontal)
+        self.seek_bar = ClickSeekSlider(Qt.Horizontal)
         self.seek_bar.setObjectName("seekBar")
         self.seek_bar.setRange(0, 100)
         self.seek_bar.setFixedWidth(400)
@@ -191,9 +197,15 @@ class MainWindowPlayback:
         self.volume_slider = QSlider(Qt.Horizontal)
         self.volume_slider.setObjectName("volumeBar")
         self.volume_slider.setRange(0, 100)
-        self.volume_slider.setValue(50)
+        try:
+            saved_volume = int(self.app_state.get("volume", 50))
+        except (TypeError, ValueError):
+            saved_volume = 50
+        self.volume_slider.setValue(max(0, min(saved_volume, 100)))
+        self.player.set_volume(self.volume_slider.value())
         self.volume_slider.setFixedWidth(100)
         self.volume_slider.valueChanged.connect(self.player.set_volume)
+        self.volume_slider.valueChanged.connect(self.save_volume_state)
         right_layout.addWidget(self.volume_slider)
 
         player_bar_layout.addWidget(right_widget)
@@ -408,6 +420,32 @@ class MainWindowPlayback:
         self.player.set_queue([song], self.client)
         self.player.play_index(0, position)
         self.switch_view(8)
+
+    def restore_last_playback(self):
+        if self.playback_restored or self.current_song_id:
+            return
+
+        song_id = self.app_state.get("last_track_id")
+        song = next(
+            (item for item in self.songs_data if item.get("id") == song_id),
+            None,
+        )
+        if not song:
+            return
+
+        try:
+            position = max(0, int(self.app_state.get("last_position", 0)))
+            duration = max(0, int(song.get("duration", 0))) * 1000
+        except (TypeError, ValueError):
+            position = 0
+            duration = 0
+        if duration and position >= duration - 5000:
+            position = 0
+
+        self.playback_restored = True
+        self.player.set_queue([song], self.client)
+        self.player.load_index_paused(0, position)
+
     def on_song_table_double_clicked(self, index):
         self.play_songs(self.songs_data, index.row())
     def on_search_result_double_clicked(self, item):
@@ -446,6 +484,8 @@ class MainWindowPlayback:
         dur_sec = song.get("duration", 0)
         self.time_total.setText(QTime(0, 0).addSecs(dur_sec).toString("m:ss"))
         self.time_current.setText("0:00")
+        self.big_time_total.setText(QTime(0, 0).addSecs(dur_sec).toString("m:ss"))
+        self.big_time_current.setText("0:00")
 
         if song.get("starred"):
             self.btn_like.setText("♥")
@@ -514,10 +554,14 @@ class MainWindowPlayback:
 
         if not self.seek_bar.isSliderDown(): 
             self.seek_bar.setValue(position)
-            self.time_current.setText(QTime(0, 0).addMSecs(position).toString("m:ss"))
-            
+            current_time = QTime(0, 0).addMSecs(position).toString("m:ss")
+            self.time_current.setText(current_time)
+
         if not self.big_seek.isSliderDown(): 
             self.big_seek.setValue(position)
+            self.big_time_current.setText(
+                QTime(0, 0).addMSecs(position).toString("m:ss")
+            )
     def maybe_scrobble_track(self, position):
         if not self.current_song_id or self.current_song_id == self.scrobbled_song_id:
             return
@@ -543,6 +587,9 @@ class MainWindowPlayback:
     def set_seek_bar_ranges(self, duration):
         self.seek_bar.setRange(0, duration)
         self.big_seek.setRange(0, duration)
+        total_time = QTime(0, 0).addMSecs(duration).toString("m:ss")
+        self.time_total.setText(total_time)
+        self.big_time_total.setText(total_time)
     def update_play_buttons(self, state):
         self.btn_play.setText("❚❚" if state == QMediaPlayer.PlayingState else "▶")
         self.btn_play.setToolTip(

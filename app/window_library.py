@@ -250,8 +250,20 @@ class MainWindowLibrary:
         card_layout.addWidget(title_label)
         card_layout.addStretch()
         
-        card.mousePressEvent = lambda event, a=album, c=card: self.handle_album_click(event, a, c)
-        card.setCursor(Qt.PointingHandCursor)
+        if grid == self.albums_grid:
+            img_label.mousePressEvent = (
+                lambda event, a=album, c=card: self.handle_album_click(
+                    event, a, c
+                )
+            )
+            img_label.setCursor(Qt.PointingHandCursor)
+        else:
+            card.mousePressEvent = (
+                lambda event, a=album, c=card: self.handle_album_click(
+                    event, a, c
+                )
+            )
+            card.setCursor(Qt.PointingHandCursor)
         grid.addWidget(card, row, col)
         
         cover_id = album.get("coverArt")
