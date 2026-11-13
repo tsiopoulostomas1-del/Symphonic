@@ -180,3 +180,10 @@ Tänään on enimmäkseen suunniteltu seuraavia vaiheita ja opeteltu ja luettu k
         - Venäjä
 
     Huom. Tulen lisäämään myöhemmin enemmän.
+
+
+### 11.11.2026
+
+    OSA 9
+
+    Lisätty muutama kieli vielä lisää kuten ranska, hollanti, kreikka, unkari yms.

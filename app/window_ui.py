@@ -22,7 +22,7 @@ class MainWindowUI:
         # --- Sidebar ---
         sidebar = QWidget()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(200)
+        sidebar.setFixedWidth(300)
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(20, 30, 20, 20)
         
