@@ -35,8 +35,21 @@ announced.
 
 ## Screenshots
 
-Screenshots are not included yet. Add screenshots from the current build here
-once they are ready.
+![Symphonic Albums screen](app/img/screenshots/albums.png)
+
+![Symphonic Albums screen](app/img/screenshots/artists.png)
+
+![Symphonic Albums screen](app/img/screenshots/liked_songs.png)
+
+![Symphonic Albums screen](app/img/screenshots/queue.png)
+
+![Symphonic Albums screen](app/img/screenshots/recently_played.png)
+
+![Symphonic Albums screen](app/img/screenshots/settings.png)
+
+![Symphonic Albums screen](app/img/screenshots/songs.png)
+
+![Symphonic Albums screen](app/img/screenshots/ui_settings.png)
 
 ## Install and run on Windows
 
