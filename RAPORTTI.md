@@ -28,17 +28,19 @@ Sovellus oli jo 60–70% valmis. On jo tehty: streaming, selaus, soittojono, lyr
 ## 3. Tekninen toteutus
 
 ### 3.1 Teknologiat
-- Python 3.13
+- Python 3.12 (testattu kehitysympäristössä)
 - PySide6 (Qt 6)
 - Subsonic API / Navidrome
 - LRCLIB (synkronoidut lyriikat)
 - Last.fm API (artistibiot)
 
 ### 3.2 Arkkitehtuuri
-Kaikki Python tiedostot sovelluksesta.
-
-Tällä hetkellä: main.py, main_window.py, player.py, subsonic.py, settings.py, style.qss, widgets/settings_dialog.py
-Huom: Tiedostoja tullaan jakamaan PIENEMPIIN osiin.
+`main.py` käynnistää sovelluksen. Käyttöliittymä ja sen toiminnallisuudet on
+jaettu `app/`-kansion moduuleihin: muun muassa `main_window.py`,
+`window_ui.py`, `window_library.py` ja `window_playback.py`. Palvelinyhteys,
+toisto, asetukset, teemat, välimuisti ja ulkoiset palvelut ovat omissa
+moduuleissaan. Asetusikkunat löytyvät `app/widgets/`-kansiosta. Testit ovat
+`tests/`-kansiossa.
 
 ### 3.3 Keskeiset toiminnallisuudet
 - albumit, artistit, kappaleet -selaus
@@ -206,4 +208,25 @@ Tänään on enimmäkseen suunniteltu seuraavia vaiheita ja opeteltu ja luettu k
 
     OSA 11
 
-    Lisätty Shuffle albumeille, genre valikko, fixattu pikku bugeja, Korjailtu playbaarin emojikokoja, toimivuutta ja selkeyttä. 
+    Lisätty Shuffle albumeille, genre valikko, fixattu pikku bugeja, Korjailtu playbaarin emojikokoja, toimivuutta ja selkeyttä.
+
+### 16.11.2026
+
+    OSA 12
+
+Parannettu hakua ja artistien tietosivujen kansikuvia sekä lisätty
+virhetilanteiden käsittelyä.
+
+- Hakutuloksissa näytetään kappaleen albumin kansikuva ja albumin nimi.
+- Artistin albumikuvien lataus käynnistyy heti artistitietojen saamisen
+  jälkeen. Biografia haetaan erikseen taustalla, eikä se enää viivästytä
+  artistin ja albumien tietojen näyttämistä.
+- Artistin diskografian kansitunniste täydennetään kirjaston tai kappaleiden
+  tiedoista, jos artistitietojen vastaus ei sisällä sitä. Kuvien lataus
+  aloitetaan vasta, kun käyttöliittymän albumikorttien asettelu on valmis.
+- Albumikorttien animaatiot pysäytetään ennen näkymän uudelleenrakennusta.
+  Virhetilanteista ilmoitetaan käyttöliittymässä ja virheelliset
+  kappalevalinnat ohitetaan.
+- Last.fm-yhteys käyttää HTTPS:ää. Salaamatonta Navidrome HTTP-yhteyttä
+  käytettäessä käyttäjältä pyydetään vahvistus.
+- Testit: 23 testiä läpäisi ajon.

@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QHeaderView, QLineEdit, QGraphicsOpacityEffect,
     QProgressBar,
 )
-from PySide6.QtCore import Qt, QPropertyAnimation, QTimer
+from PySide6.QtCore import Qt, QSize, QPropertyAnimation, QTimer
 from app.widgets.seek_slider import ClickSeekSlider
 
 
@@ -85,6 +85,15 @@ class MainWindowUI:
         self.btn_ui_settings.setCursor(Qt.PointingHandCursor)
         self.btn_ui_settings.clicked.connect(self.open_ui_settings)
         sidebar_layout.addWidget(self.btn_ui_settings)
+        self.navigation_buttons = [
+            self.btn_nav_artists,
+            self.btn_nav_albums,
+            self.btn_nav_songs,
+            self.btn_nav_queue,
+            self.btn_nav_nowplaying,
+            self.btn_nav_recent,
+            self.btn_liked_songs,
+        ]
         
         top_layout.addWidget(sidebar)
 
@@ -145,6 +154,7 @@ class MainWindowUI:
         artists_layout.setContentsMargins(0, 0, 0, 0)
         self.artists_list = QListWidget()
         self.artists_list.setObjectName("trackList")
+        self.artists_list.setIconSize(QSize(40, 40))
         self.artists_list.itemDoubleClicked.connect(self.on_artist_double_clicked)
         self.artists_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.artists_list.customContextMenuRequested.connect(self.show_artists_context_menu)
@@ -237,6 +247,7 @@ class MainWindowUI:
         search_layout.setContentsMargins(0, 0, 0, 0)
         self.search_results_list = QListWidget()
         self.search_results_list.setObjectName("trackList")
+        self.search_results_list.setIconSize(QSize(56, 56))
         self.search_results_list.itemDoubleClicked.connect(self.on_search_result_double_clicked)
         search_layout.addWidget(self.search_results_list)
 
@@ -441,6 +452,16 @@ class MainWindowUI:
         content_layout.addWidget(self.content_stack)
         top_layout.addWidget(self.main_content_widget)
         self.main_layout.addLayout(top_layout)
+
+    def set_active_navigation(self, active_button):
+        for button in self.navigation_buttons:
+            active = button is active_button
+            if button.property("active") == active:
+                continue
+            button.setProperty("active", active)
+            button.style().unpolish(button)
+            button.style().polish(button)
+            button.update()
 
     def setup_overlays(self):
         # --- Now Playing Full Screen Overlay ---

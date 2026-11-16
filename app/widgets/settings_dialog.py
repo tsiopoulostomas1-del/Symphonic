@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QMessageBox, QGraphicsOpacityEffect,
@@ -65,7 +67,7 @@ class SettingsDialog(QDialog):
         self.url_label = QLabel()
         self.url_label.setObjectName("inputLabel")
         self.server_input = QLineEdit()
-        self.server_input.setPlaceholderText("http://192.168.1.100:4533")
+        self.server_input.setPlaceholderText("https://music.example.com")
         self.server_input.setText(current_settings.get("server", ""))
         self.server_input.setFixedHeight(50) # Force height
         layout.addWidget(self.url_label)
@@ -168,6 +170,17 @@ class SettingsDialog(QDialog):
                 translate(self.current_language, "fill_fields"),
             )
             return
+
+        if urlsplit(url).scheme.lower() == "http":
+            answer = QMessageBox.question(
+                self,
+                translate(self.current_language, "insecure_connection_title"),
+                translate(self.current_language, "insecure_connection_message"),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if answer != QMessageBox.Yes:
+                return
 
         self.btn_save.setText(translate(self.current_language, "connecting"))
         self.btn_save.setEnabled(False)

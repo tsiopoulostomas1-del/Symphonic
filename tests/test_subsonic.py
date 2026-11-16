@@ -3,17 +3,22 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QBuffer, QIODevice, QPropertyAnimation, QSize, Qt
 from PySide6.QtMultimedia import QMediaPlayer
+from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import (
-    QApplication, QListWidget, QListWidgetItem, QPushButton,
+    QApplication, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
+    QWidget,
 )
 
 from app.player import Player
+from app.services import fetch_artist_bio_from_lastfm
 from app.subsonic import SubsonicClient
-from app.main_window import LibraryLoader
+from app.main_window import ARTIST_COVER_ROLE, LibraryLoader, MainWindow
 from app.window_library import ArtistDetailsLoader, MainWindowLibrary, SearchLoader
 from app.window_playback import MainWindowPlayback
+from app.window_ui import MainWindowUI
+from app.widgets.settings_dialog import SettingsDialog
 from app.windows_taskbar import (
     BUTTON_NEXT, BUTTON_PLAY_PAUSE, BUTTON_PREVIOUS, THBN_CLICKED, WM_COMMAND,
     WindowsTaskbarControls, _NativeMessage,
@@ -99,6 +104,34 @@ class SubsonicClientTests(unittest.TestCase):
 
         self.assertTrue(mock_get.call_args.args[0].endswith("/rest/star.view"))
         self.assertEqual(mock_get.call_args.kwargs["params"]["id"], "song-1")
+
+    @patch("app.subsonic.requests.get")
+    def test_update_playlist_checks_subsonic_response(self, mock_get):
+        response = Mock()
+        response.json.return_value = {
+            "subsonic-response": {
+                "status": "failed",
+                "error": {"code": 40, "message": "Permission denied"},
+            }
+        }
+        mock_get.return_value = response
+        client = SubsonicClient("http://server", "user", "password")
+
+        with self.assertRaisesRegex(RuntimeError, "Permission denied"):
+            client.update_playlist("playlist-1", "song-1")
+
+    @patch("app.services.requests.get")
+    def test_artist_biography_uses_https(self, mock_get):
+        response = Mock()
+        response.json.return_value = {
+            "artist": {"bio": {"summary": "Artist bio"}}
+        }
+        mock_get.return_value = response
+
+        result = fetch_artist_bio_from_lastfm("Artist", "public-api-key")
+
+        self.assertEqual(result, "Artist bio")
+        self.assertTrue(mock_get.call_args.args[0].startswith("https://"))
 
     def test_album_song_like_updates_local_state_after_server_success(self):
         app = QApplication.instance() or QApplication([])
@@ -308,15 +341,139 @@ class SubsonicClientTests(unittest.TestCase):
         artist_info = {"id": "artist-1", "album": []}
         client = Mock()
         client.get_artist_info.return_value = artist_info
-        fetch_bio.return_value = "Artist biography"
         loader = ArtistDetailsLoader(1, client, "artist-1", "Artist")
         loaded = []
+        bios = []
         loader.loaded.connect(lambda *args: loaded.append(args))
+        loader.bio_loaded.connect(lambda *args: bios.append(args))
+
+        def fetch_bio_after_artist_info(*_args):
+            self.assertEqual(loaded, [(1, "artist-1", artist_info)])
+            return "Artist biography"
+
+        fetch_bio.side_effect = fetch_bio_after_artist_info
 
         loader.run()
 
         self.assertEqual(client.get_artist_info.call_args.args, ("artist-1",))
-        self.assertEqual(loaded[0][2:], (artist_info, "Artist biography"))
+        self.assertEqual(loaded, [(1, "artist-1", artist_info)])
+        self.assertEqual(bios, [(1, "artist-1", "Artist biography")])
+
+    def test_artist_discography_uses_library_cover_when_missing(self):
+        album_grid = object()
+        window = SimpleNamespace(
+            artist_details_request_id=5,
+            current_artist_id="artist-1",
+            albums_data=[{"id": "album-1", "coverArt": "cover-1"}],
+            songs_data=[],
+            artist_albums_grid=album_grid,
+            add_album_card=Mock(),
+            load_visible_album_art=Mock(),
+        )
+        artist_info = {
+            "album": [{"id": "album-1", "name": "Artist album"}]
+        }
+
+        with patch("app.window_library.QTimer.singleShot") as single_shot:
+            MainWindowLibrary.on_artist_details_loaded(
+                window, 5, "artist-1", artist_info
+            )
+
+        self.assertEqual(
+            window.current_artist_albums[0]["coverArt"], "cover-1"
+        )
+        window.add_album_card.assert_called_once_with(
+            window.current_artist_albums[0], album_grid, 0, 0
+        )
+        single_shot.assert_called_once_with(0, window.load_visible_album_art)
+
+    def test_artist_list_uses_matching_album_art_as_thumbnail_source(self):
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+        artists_list = QListWidget()
+        item = QListWidgetItem("Artist")
+        item.setData(Qt.UserRole, "artist-1")
+        artists_list.addItem(item)
+        window = SimpleNamespace(
+            artists_data=[{"id": "artist-1", "name": "Artist"}],
+            artists_list=artists_list,
+            albums_data=[{
+                "artistId": "artist-1",
+                "artist": "Artist",
+                "coverArt": "album-cover",
+            }],
+            songs_data=[],
+        )
+
+        MainWindow._refresh_artist_cover_data(window)
+
+        self.assertEqual(item.data(ARTIST_COVER_ROLE), "album-cover")
+
+    def test_artist_thumbnail_is_rounded_icon_at_list_icon_size(self):
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+        artists_list = QListWidget()
+        artists_list.setIconSize(QSize(40, 40))
+        item = QListWidgetItem("Artist")
+        item.setData(Qt.UserRole, "artist-1")
+        item.setData(ARTIST_COVER_ROLE, "album-cover")
+        artists_list.addItem(item)
+        source = QPixmap(80, 40)
+        source.fill(QColor("red"))
+        buffer = QBuffer()
+        self.assertTrue(buffer.open(QIODevice.WriteOnly))
+        self.assertTrue(source.save(buffer, "PNG"))
+        image_data = bytes(buffer.data())
+        buffer.close()
+
+        MainWindow._set_artist_thumbnail(
+            SimpleNamespace(artists_list=artists_list),
+            image_data,
+            "artist-1",
+            "album-cover",
+        )
+
+        self.assertFalse(item.icon().isNull())
+        self.assertEqual(item.icon().pixmap(QSize(40, 40)).size(), QSize(40, 40))
+
+    def test_active_navigation_maps_detail_pages_to_parent_sections(self):
+        window = SimpleNamespace(
+            btn_nav_artists=object(),
+            btn_nav_albums=object(),
+            btn_nav_songs=object(),
+            btn_nav_queue=object(),
+            btn_nav_recent=object(),
+            btn_liked_songs=object(),
+            showing_liked_songs=False,
+            set_active_navigation=Mock(),
+        )
+
+        MainWindow.update_active_navigation(window, 5)
+        window.set_active_navigation.assert_called_once_with(window.btn_nav_albums)
+        window.set_active_navigation.reset_mock()
+        MainWindow.update_active_navigation(window, 6)
+        window.set_active_navigation.assert_called_once_with(window.btn_nav_artists)
+        window.set_active_navigation.reset_mock()
+        MainWindow.update_active_navigation(window, 7)
+        window.set_active_navigation.assert_called_once_with(None)
+        window.showing_liked_songs = True
+        window.set_active_navigation.reset_mock()
+        MainWindow.update_active_navigation(window, 7)
+        window.set_active_navigation.assert_called_once_with(window.btn_liked_songs)
+
+    def test_active_navigation_property_updates_for_sidebar_buttons(self):
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+        first = QPushButton()
+        second = QPushButton()
+        first.setObjectName("navButton")
+        second.setObjectName("navButton")
+        window = SimpleNamespace(navigation_buttons=[first, second])
+
+        MainWindowUI.set_active_navigation(window, second)
+
+        self.assertFalse(first.property("active"))
+        self.assertTrue(second.property("active"))
 
     def test_search_loader_returns_matching_song_data(self):
         songs = [{"id": "song-1", "title": "Matched song"}]
@@ -352,6 +509,138 @@ class SubsonicClientTests(unittest.TestCase):
         )
 
         play_songs.assert_called_once_with(songs, 1)
+
+    def test_play_songs_ignores_out_of_range_selection(self):
+        player = Mock()
+        window = SimpleNamespace(player=player, client=Mock())
+
+        MainWindowPlayback.play_songs(window, [{"id": "song-1"}], 1)
+
+        player.set_queue.assert_not_called()
+        player.play_index.assert_not_called()
+
+    def test_album_rerender_stops_running_click_animations(self):
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+        widget = QWidget()
+        animation = QPropertyAnimation(widget, b"windowOpacity")
+        animation.setStartValue(0.0)
+        animation.setEndValue(1.0)
+        animation.setDuration(5000)
+        animation.start()
+        window = SimpleNamespace(album_animations=[animation])
+
+        MainWindowLibrary.stop_album_animations(window)
+
+        self.assertEqual(animation.state(), QPropertyAnimation.Stopped)
+        self.assertEqual(window.album_animations, [])
+        widget.close()
+
+    def test_search_results_show_album_and_load_cover_art(self):
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+
+        pixmap = QPixmap(8, 8)
+        pixmap.fill(Qt.red)
+        buffer = QBuffer()
+        self.assertTrue(buffer.open(QIODevice.WriteOnly))
+        self.assertTrue(pixmap.save(buffer, "PNG"))
+        image_data = bytes(buffer.data())
+
+        results_list = QListWidget()
+        window = SimpleNamespace(
+            search_request_id=3,
+            search_input=SimpleNamespace(text=lambda: "matched"),
+            search_results_data=[],
+            search_results_list=results_list,
+            text=lambda key: "Unknown",
+            load_cover_art=lambda cover_id, size, callback: callback(image_data),
+            switch_view=Mock(),
+        )
+        window.on_search_art_downloaded = (
+            lambda data, request_id, song_id:
+                MainWindowLibrary.on_search_art_downloaded(
+                    window, data, request_id, song_id
+                )
+        )
+        song = {
+            "id": "song-1",
+            "title": "Matched song",
+            "artist": "Matched artist",
+            "album": "Matched album",
+            "coverArt": "cover-1",
+        }
+
+        MainWindowLibrary.on_search_loaded(window, 3, "matched", [song])
+
+        item = results_list.item(0)
+        self.assertIn("Matched album", item.text())
+        self.assertFalse(item.icon().isNull())
+        self.assertEqual(item.data(Qt.UserRole), song)
+
+    def test_stale_search_artwork_is_ignored(self):
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+        results_list = QListWidget()
+        item = QListWidgetItem("Current result")
+        item.setData(Qt.UserRole, {"id": "song-1"})
+        results_list.addItem(item)
+        window = SimpleNamespace(
+            search_request_id=4,
+            search_results_list=results_list,
+        )
+
+        MainWindowLibrary.on_search_art_downloaded(
+            window, b"not an image", 3, "song-1"
+        )
+
+        self.assertTrue(item.icon().isNull())
+
+    def test_library_display_errors_are_reported_without_escaping_slot(self):
+        client = object()
+        window = SimpleNamespace(
+            library_load_id=1,
+            client=client,
+            _apply_library_data=Mock(side_effect=RuntimeError("bad data")),
+            library_progress=Mock(),
+            retry_library_button=Mock(),
+            library_status=Mock(),
+            text=lambda key: key,
+        )
+
+        with (
+            patch("app.main_window.logger.exception") as log_error,
+            patch("app.main_window.QMessageBox.warning") as warning,
+        ):
+            MainWindow.on_library_loaded(window, 1, client, {"albums": []})
+
+        window.library_progress.hide.assert_called_once_with()
+        window.retry_library_button.show.assert_called_once_with()
+        self.assertEqual(window._library_display_failure_id, 1)
+        log_error.assert_called_once()
+        warning.assert_called_once()
+
+    @patch(
+        "app.widgets.settings_dialog.QMessageBox.question",
+        return_value=QMessageBox.No,
+    )
+    @patch("app.widgets.settings_dialog.SubsonicClient")
+    def test_settings_dialog_requires_confirmation_for_http(
+        self, mock_client, mock_question
+    ):
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+        dialog = SettingsDialog({"language": "en"})
+        dialog.server_input.setText("http://music.example.com")
+        dialog.user_input.setText("user")
+        dialog.pass_input.setText("password")
+
+        dialog.validate_and_save()
+
+        mock_question.assert_called_once()
+        mock_client.assert_not_called()
+        dialog.title_cycle_timer.stop()
+        dialog.close()
 
 
 if __name__ == "__main__":

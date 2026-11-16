@@ -38,6 +38,13 @@ QWidget {
     color: #FFFFFF;
 }
 
+#navButton[active="true"] {
+    background-color: #0F2A3F;
+    border-left: 3px solid #00E5FF;
+    color: #00E5FF;
+    padding-left: 12px;
+}
+
 /* --- Content Area --- */
 #contentArea {
     background-color: #12151C;

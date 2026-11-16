@@ -132,7 +132,7 @@ def fetch_lyrics_from_lyrics_ovh(track_title: str, artist_name: str) -> str:
 # Last.fm (artist biography)
 # ---------------------------------------------------------------------------
 
-LASTFM_URL = "http://ws.audioscrobbler.com/2.0/"
+LASTFM_URL = "https://ws.audioscrobbler.com/2.0/"
 
 
 def fetch_artist_bio_from_lastfm(artist_name: str, api_key: str) -> str:

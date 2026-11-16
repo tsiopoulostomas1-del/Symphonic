@@ -374,13 +374,17 @@ class MainWindowPlayback:
                 self.hover_zone.setGeometry(0, self.lyrics_overlay.height() - 80, self.lyrics_overlay.width(), 80)
     def open_now_playing_view(self, event):
         self.now_playing_overlay.resize(self.centralWidget().size())
+        self.set_active_navigation(self.btn_nav_nowplaying)
         self.now_playing_overlay.show()
         self.now_playing_overlay.raise_()
         if event is not None:
             event.accept()
     def close_now_playing_view(self):
         self.now_playing_overlay.hide()
+        self.update_active_navigation(self.content_stack.currentIndex())
     def play_songs(self, songs_list, start_index):
+        if not songs_list or not 0 <= start_index < len(songs_list):
+            return
         self.player.set_queue(songs_list, self.client)
         self.player.play_index(start_index)
     def populate_recently_played(self):
@@ -450,11 +454,12 @@ class MainWindowPlayback:
         self.play_songs(self.songs_data, index.row())
     def on_search_result_double_clicked(self, item):
         song = item.data(Qt.UserRole)
-        if not isinstance(song, dict):
+        row = self.search_results_list.row(item)
+        if not isinstance(song, dict) or not 0 <= row < len(self.search_results_data):
             return
         self.play_songs(
             self.search_results_data,
-            self.search_results_list.row(item),
+            row,
         )
     def on_track_changed(self, song):
         self.current_song_id = song["id"]

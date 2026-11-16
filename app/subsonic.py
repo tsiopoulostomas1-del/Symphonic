@@ -244,6 +244,7 @@ class SubsonicClient:
         params["playlistId"] = playlist_id
         if song_id_to_add:
             params["songIdToAdd"] = song_id_to_add
-        requests.get(
+        resp = requests.get(
             f"{self.server}/rest/updatePlaylist.view", params=params, timeout=15
         )
+        self._parse_response(resp)

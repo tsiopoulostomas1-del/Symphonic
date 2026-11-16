@@ -9,11 +9,11 @@ from PySide6.QtWidgets import (
     QAbstractSpinBox,
 )
 from PySide6.QtCore import (
-    Qt, QEvent, QRect, QUrl, QPropertyAnimation, QEasingCurve, QTimer,
-    QThread, Signal, Slot,
+    Qt, QEvent, QPoint, QRect, QRectF, QUrl, QPropertyAnimation,
+    QEasingCurve, QTimer, QThread, Signal, Slot,
 )
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
-from PySide6.QtGui import QPixmap, QColor
+from PySide6.QtGui import QPixmap, QColor, QIcon, QPainter, QPainterPath
 from shiboken6 import isValid
 
 from app.app_state import load_app_state, save_app_state
@@ -32,6 +32,9 @@ from app.window_playback import MainWindowPlayback
 from app.windows_taskbar import WindowsTaskbarControls
 
 logger = logging.getLogger(__name__)
+
+ARTIST_COVER_ROLE = Qt.UserRole + 1
+ARTIST_ARTWORK_REQUESTED_ROLE = Qt.UserRole + 2
 
 
 class LibraryLoader(QThread):
@@ -187,6 +190,10 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
                 )
 
         self.setup_main_ui()
+        self.update_active_navigation(self.content_stack.currentIndex())
+        self.artists_list.verticalScrollBar().valueChanged.connect(
+            self.load_visible_artist_art
+        )
         self.albums_scroll.verticalScrollBar().valueChanged.connect(
             self.load_visible_album_art
         )
@@ -194,7 +201,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             self.load_visible_album_art
         )
         self.content_stack.currentChanged.connect(
-            lambda index: QTimer.singleShot(0, self.load_visible_album_art)
+            lambda index: QTimer.singleShot(0, self.schedule_visible_artwork)
             if index >= 0
             else None
         )
@@ -214,6 +221,10 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         QTimer.singleShot(0, self.setup_taskbar_controls)
         QTimer.singleShot(0, self.load_visible_album_art)
         QTimer.singleShot(0, self.load_all_data)
+
+    def schedule_visible_artwork(self):
+        self.load_visible_album_art()
+        self.load_visible_artist_art()
 
     def setup_taskbar_controls(self):
         if self.taskbar_controls:
@@ -400,6 +411,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         if not hasattr(self, "albums_grid"):
             return
 
+        self.stop_album_animations()
         selected_genre = (
             self.genre_filter.currentText()
             if hasattr(self, "genre_filter")
@@ -550,6 +562,7 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         self.bar_anim.start()
     def switch_view(self, index):
         self.content_stack.setCurrentIndex(index)
+        self.update_active_navigation(index)
         title_keys = [
             "artists", "albums", "songs", "queue", "search_results",
             "album_details", "artist_details", "playlist", "recently_played",
@@ -585,6 +598,24 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             
         if index == 3:
             self.populate_queue_table()
+
+    def update_active_navigation(self, index):
+        navigation_by_view = {
+            0: self.btn_nav_artists,
+            1: self.btn_nav_albums,
+            2: self.btn_nav_songs,
+            3: self.btn_nav_queue,
+            4: self.btn_nav_songs,
+            5: self.btn_nav_albums,
+            6: self.btn_nav_artists,
+            8: self.btn_nav_recent,
+        }
+        if index == 7 and self.showing_liked_songs:
+            active_button = self.btn_liked_songs
+        else:
+            active_button = navigation_by_view.get(index)
+        self.set_active_navigation(active_button)
+
     def go_back(self):
         current = self.content_stack.currentIndex()
         if current == 5:
@@ -619,9 +650,11 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
             self.artists_list.clear()
             self.songs_table.setRowCount(0)
             self.playlists_list.clear()
+            self.stop_album_animations()
             for i in reversed(range(self.albums_grid.count())): 
                 widget = self.albums_grid.itemAt(i).widget()
-                if widget: widget.setParent(None)
+                if widget:
+                    widget.deleteLater()
             self.load_all_data()
 
     def open_ui_settings(self):
@@ -637,31 +670,33 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
         if theme not in THEMES:
             return
         try:
+            stylesheet = build_stylesheet(theme)
             save_theme(theme)
-        except (OSError, ValueError) as error:
+            application = QApplication.instance()
+            if application:
+                application.setStyleSheet(stylesheet)
+
+            self.settings["theme"] = theme
+            self.accent_color = THEMES[theme]["accent"]
+            if self.btn_like.text() == "♥":
+                self.btn_like.setStyleSheet(
+                    f"color: {self.accent_color}; font-size: 20px;"
+                )
+            self.btn_shuffle.setStyleSheet(
+                f"color: {self.accent_color};"
+                if self.player.is_shuffle else "color: #64748B;"
+            )
+            self.btn_repeat.setStyleSheet(
+                f"color: {self.accent_color};"
+                if self.player.is_repeat else "color: #64748B;"
+            )
+            self.populate_songs_table(self.songs_data)
+        except Exception:
+            logger.exception("Could not apply the selected theme.")
             QMessageBox.critical(
-                self, self.text("error"), str(error)
+                self, self.text("error"), self.text("theme_apply_failed")
             )
             return
-
-        self.settings["theme"] = theme
-        self.accent_color = THEMES[theme]["accent"]
-        application = QApplication.instance()
-        if application:
-            application.setStyleSheet(build_stylesheet(theme))
-        if self.btn_like.text() == "♥":
-            self.btn_like.setStyleSheet(
-                f"color: {self.accent_color}; font-size: 20px;"
-            )
-        self.btn_shuffle.setStyleSheet(
-            f"color: {self.accent_color};"
-            if self.player.is_shuffle else "color: #64748B;"
-        )
-        self.btn_repeat.setStyleSheet(
-            f"color: {self.accent_color};"
-            if self.player.is_repeat else "color: #64748B;"
-        )
-        self.populate_songs_table(self.songs_data)
 
     def load_all_data(self):
         if not self.client:
@@ -695,20 +730,47 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
     def on_library_loaded(self, request_id, client, data):
         if request_id != self.library_load_id or client is not self.client:
             return
+        if getattr(self, "_library_display_failure_id", None) == request_id:
+            return
 
+        try:
+            self._apply_library_data(data)
+        except Exception:
+            logger.exception(
+                "Could not display data returned by the library loader."
+            )
+            self._library_display_failure_id = request_id
+            self.library_progress.hide()
+            self.retry_library_button.show()
+            self.library_status.setText(self.text("library_load_failed_status"))
+            QMessageBox.warning(
+                self,
+                self.text("library_load_failed"),
+                self.text("library_load_failed_status"),
+            )
+
+    def _apply_library_data(self, data):
         if "songs" in data:
             self.songs_data = data["songs"]
             self.populate_songs_table(self.songs_data)
             self.update_album_genre_options()
             self.render_album_grid()
+            self._refresh_artist_cover_data()
+            QTimer.singleShot(0, self.load_visible_artist_art)
 
         if "artists" in data:
             self.artists_data = data["artists"]
             self.artists_list.clear()
+            self.artists_data = [
+                artist for artist in self.artists_data
+                if isinstance(artist, dict)
+            ]
             for artist in self.artists_data:
                 item = QListWidgetItem(artist.get("name", self.text("unknown")))
                 item.setData(Qt.UserRole, artist.get("id"))
                 self.artists_list.addItem(item)
+            self._refresh_artist_cover_data()
+            QTimer.singleShot(0, self.load_visible_artist_art)
 
         if "albums" in data:
             self.albums_data = data["albums"]
@@ -736,9 +798,115 @@ class MainWindow(MainWindowUI, MainWindowLibrary, MainWindowPlayback, QMainWindo
                 self.text("loaded_songs", count=len(self.songs_data))
             )
 
+    def _refresh_artist_cover_data(self):
+        covers_by_artist_id = {}
+        covers_by_artist_name = {}
+        for media in self.albums_data + self.songs_data:
+            cover_id = media.get("coverArt")
+            if not cover_id:
+                continue
+            artist_id = media.get("artistId")
+            if artist_id is not None:
+                covers_by_artist_id.setdefault(str(artist_id), str(cover_id))
+            artist_name = media.get("artist")
+            if artist_name:
+                covers_by_artist_name.setdefault(
+                    str(artist_name).casefold(), str(cover_id)
+                )
+
+        for row, artist in enumerate(self.artists_data):
+            item = self.artists_list.item(row)
+            if item is None:
+                continue
+            cover_id = (
+                artist.get("coverArt")
+                or covers_by_artist_id.get(str(artist.get("id", "")))
+                or covers_by_artist_name.get(
+                    str(artist.get("name", "")).casefold()
+                )
+            )
+            item.setData(ARTIST_COVER_ROLE, str(cover_id) if cover_id else "")
+
+    def load_visible_artist_art(self):
+        viewport = self.artists_list.viewport()
+        viewport_rect = viewport.rect()
+        first = self.artists_list.indexAt(QPoint(8, 0))
+        if not first.isValid():
+            return
+        last = self.artists_list.indexAt(
+            QPoint(8, max(0, viewport_rect.height() - 1))
+        )
+        last_row = last.row() if last.isValid() else self.artists_list.count() - 1
+
+        for row in range(first.row(), last_row + 1):
+            item = self.artists_list.item(row)
+            if item is None or not self.artists_list.visualItemRect(item).intersects(
+                viewport_rect
+            ):
+                continue
+            cover_id = item.data(ARTIST_COVER_ROLE)
+            if not cover_id or item.data(ARTIST_ARTWORK_REQUESTED_ROLE):
+                continue
+
+            artist_id = item.data(Qt.UserRole)
+            if artist_id is None:
+                continue
+            item.setData(ARTIST_ARTWORK_REQUESTED_ROLE, True)
+            self.load_cover_art(
+                str(cover_id),
+                80,
+                lambda data, requested_id=artist_id,
+                    requested_cover_id=str(cover_id):
+                        self._set_artist_thumbnail(
+                            data, requested_id, requested_cover_id
+                        ),
+            )
+
+    def _set_artist_thumbnail(self, data, artist_id, cover_id):
+        if not data:
+            return
+        item = None
+        for row in range(self.artists_list.count()):
+            candidate = self.artists_list.item(row)
+            if (
+                candidate
+                and candidate.data(Qt.UserRole) == artist_id
+                and candidate.data(ARTIST_COVER_ROLE) == cover_id
+            ):
+                item = candidate
+                break
+        if item is None:
+            return
+
+        image = QPixmap()
+        if not image.loadFromData(data):
+            return
+
+        size = self.artists_list.iconSize()
+        scaled = image.scaled(
+            size,
+            Qt.KeepAspectRatioByExpanding,
+            Qt.SmoothTransformation,
+        )
+        x = max(0, (scaled.width() - size.width()) // 2)
+        y = max(0, (scaled.height() - size.height()) // 2)
+        cropped = scaled.copy(x, y, size.width(), size.height())
+        rounded = QPixmap(size)
+        rounded.fill(Qt.transparent)
+        painter = QPainter(rounded)
+        painter.setRenderHint(QPainter.Antialiasing)
+        clip = QPainterPath()
+        clip.addRoundedRect(QRectF(0, 0, size.width(), size.height()), 7, 7)
+        painter.setClipPath(clip)
+        painter.drawPixmap(0, 0, cropped)
+        painter.end()
+
+        item.setIcon(QIcon(rounded))
     @Slot(int, object)
     def on_library_load_completed(self, request_id, client):
         if request_id != self.library_load_id or client is not self.client:
+            return
+        if getattr(self, "_library_display_failure_id", None) == request_id:
             return
 
         song_count = len(self.songs_data)

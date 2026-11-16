@@ -122,6 +122,12 @@ TRANSLATIONS = {
         "language": "Language",
         "username": "Username",
         "server_url": "Server URL",
+        "insecure_connection_title": "Unencrypted Connection",
+        "insecure_connection_message": (
+            "This server uses unencrypted HTTP. Use HTTPS on public networks. "
+            "Continue anyway?"
+        ),
+        "theme_apply_failed": "The theme could not be fully applied. Try selecting it again.",
         "password": "Password",
         "cancel": "Cancel",
         "save_connect": "Save & Connect",
@@ -250,6 +256,12 @@ TRANSLATIONS = {
         "language": "Kieli",
         "username": "Käyttäjätunnus",
         "server_url": "Palvelimen URL / IP-osoite",
+        "insecure_connection_title": "Salaamaton yhteys",
+        "insecure_connection_message": (
+            "Palvelin käyttää salaamatonta HTTP-yhteyttä. Käytä HTTPS-yhteyttä "
+            "julkisissa verkoissa. Jatketaanko silti?"
+        ),
+        "theme_apply_failed": "Teemaa ei voitu ottaa kokonaan käyttöön. Yritä valita se uudelleen.",
         "password": "Salasana",
         "cancel": "Peruuta",
         "save_connect": "Tallenna ja yhdistä",
@@ -378,6 +390,12 @@ TRANSLATIONS = {
         "language": "Язык",
         "username": "Имя пользователя",
         "server_url": "URL сервера",
+        "insecure_connection_title": "Незащищённое соединение",
+        "insecure_connection_message": (
+            "Сервер использует незашифрованный HTTP. В общедоступных сетях "
+            "используйте HTTPS. Продолжить?"
+        ),
+        "theme_apply_failed": "Не удалось полностью применить тему. Попробуйте выбрать её ещё раз.",
         "password": "Пароль",
         "cancel": "Отмена",
         "save_connect": "Сохранить и Подключиться",
@@ -506,6 +524,12 @@ TRANSLATIONS = {
         "language": "Γλώσσα",
         "username": "Όνομα χρήστη",
         "server_url": "URL διακομιστή",
+        "insecure_connection_title": "Μη κρυπτογραφημένη σύνδεση",
+        "insecure_connection_message": (
+            "Αυτός ο διακομιστής χρησιμοποιεί μη κρυπτογραφημένο HTTP. "
+            "Χρησιμοποιήστε HTTPS σε δημόσια δίκτυα. Συνέχεια;"
+        ),
+        "theme_apply_failed": "Δεν ήταν δυνατή η πλήρης εφαρμογή του θέματος. Δοκιμάστε να το επιλέξετε ξανά.",
         "password": "Κωδικός πρόσβασης",
         "cancel": "Ακύρωση",
         "save_connect": "Αποθήκευση & Σύνδεση",
@@ -630,6 +654,12 @@ TRANSLATIONS = {
         "language": "Idioma",
         "username": "Nombre de usuario",
         "server_url": "URL del servidor",
+        "insecure_connection_title": "Conexión sin cifrar",
+        "insecure_connection_message": (
+            "Este servidor usa HTTP sin cifrar. Usa HTTPS en redes públicas. "
+            "¿Continuar de todos modos?"
+        ),
+        "theme_apply_failed": "No se pudo aplicar el tema por completo. Intenta seleccionarlo de nuevo.",
         "password": "Contraseña",
         "cancel": "Cancelar",
         "save_connect": "Guardar y conectar",
@@ -751,6 +781,11 @@ TRANSLATIONS = {
         "language": "语言",
         "username": "用户名",
         "server_url": "服务器 URL",
+        "insecure_connection_title": "未加密的连接",
+        "insecure_connection_message": (
+            "此服务器使用未加密的 HTTP。请在公共网络中使用 HTTPS。仍要继续吗？"
+        ),
+        "theme_apply_failed": "无法完全应用所选主题。请尝试重新选择。",
         "password": "密码",
         "cancel": "取消",
         "save_connect": "保存并连接",
@@ -872,6 +907,12 @@ TRANSLATIONS = {
         "language": "Sprache",
         "username": "Benutzername",
         "server_url": "Server-URL",
+        "insecure_connection_title": "Unverschlüsselte Verbindung",
+        "insecure_connection_message": (
+            "Dieser Server verwendet unverschlüsseltes HTTP. Verwende in "
+            "öffentlichen Netzwerken HTTPS. Trotzdem fortfahren?"
+        ),
+        "theme_apply_failed": "Das Design konnte nicht vollständig angewendet werden. Wähle es erneut aus.",
         "password": "Passwort",
         "cancel": "Abbrechen",
         "save_connect": "Speichern & Verbinden",
@@ -993,6 +1034,12 @@ TRANSLATIONS = {
         "language": "Langue",
         "username": "Nom d'utilisateur",
         "server_url": "URL du serveur",
+        "insecure_connection_title": "Connexion non chiffrée",
+        "insecure_connection_message": (
+            "Ce serveur utilise HTTP sans chiffrement. Utilisez HTTPS sur les "
+            "réseaux publics. Continuer quand même ?"
+        ),
+        "theme_apply_failed": "Le thème n'a pas pu être entièrement appliqué. Essayez de le sélectionner à nouveau.",
         "password": "Mot de passe",
         "cancel": "Annuler",
         "save_connect": "Enregistrer et connecter",
@@ -1114,6 +1161,12 @@ TRANSLATIONS = {
         "language": "Nyelv",
         "username": "Felhasználónév",
         "server_url": "Szerver URL-címe",
+        "insecure_connection_title": "Titkosítatlan kapcsolat",
+        "insecure_connection_message": (
+            "Ez a szerver titkosítatlan HTTP-t használ. Nyilvános hálózatokon "
+            "használj HTTPS-t. Folytatod?"
+        ),
+        "theme_apply_failed": "A témát nem sikerült teljesen alkalmazni. Próbáld meg újra kiválasztani.",
         "password": "Jelszó",
         "cancel": "Mégse",
         "save_connect": "Mentés és csatlakozás",
@@ -1235,6 +1288,12 @@ TRANSLATIONS = {
         "language": "Jezik",
         "username": "Korisničko ime",
         "server_url": "URL servera",
+        "insecure_connection_title": "Nešifrovana veza",
+        "insecure_connection_message": (
+            "Ovaj server koristi nešifrovani HTTP. Koristite HTTPS na javnim "
+            "mrežama. Ipak nastaviti?"
+        ),
+        "theme_apply_failed": "Tema nije mogla u potpunosti da se primeni. Pokušajte ponovo da je izaberete.",
         "password": "Lozinka",
         "cancel": "Otkaži",
         "save_connect": "Sačuvaj i poveži se",
@@ -1356,6 +1415,12 @@ TRANSLATIONS = {
         "language": "Taal",
         "username": "Gebruikersnaam",
         "server_url": "Server-URL",
+        "insecure_connection_title": "Onbeveiligde verbinding",
+        "insecure_connection_message": (
+            "Deze server gebruikt onversleutelde HTTP. Gebruik HTTPS op "
+            "openbare netwerken. Toch doorgaan?"
+        ),
+        "theme_apply_failed": "Het thema kon niet volledig worden toegepast. Probeer het opnieuw te selecteren.",
         "password": "Wachtwoord",
         "cancel": "Annuleren",
         "save_connect": "Opslaan & Verbinden",
@@ -1473,6 +1538,12 @@ TRANSLATIONS = {
         "language": "Giella",
         "username": "Geavaheaddjinamma",
         "server_url": "Fáldá URL",
+        "insecure_connection_title": "Krypterekeahtes oktavuohta",
+        "insecure_connection_message": (
+            "Dát bálvá geavaha krypterekeahtes HTTP. Geavat HTTPS almmolaš "
+            "fierpmádagain. Joatkit goit?"
+        ),
+        "theme_apply_failed": "Ii sáhttán bidjat fátta ollásit. Geahččal válljet dan ođđasit.",
         "password": "Beassansátni",
         "cancel": "Eanhet",
         "save_connect": "Vurke & Váldde oktavuođa",

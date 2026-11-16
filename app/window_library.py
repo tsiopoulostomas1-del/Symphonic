@@ -2,9 +2,9 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QListWidgetItem, QTableWidgetItem, QPushButton,
     QMenu, QInputDialog, QMessageBox,
 )
-from PySide6.QtCore import Qt, QTime, QThread, Signal, Slot
+from PySide6.QtCore import Qt, QSize, QTime, QThread, QTimer, Signal, Slot
 from PySide6.QtCore import QPropertyAnimation, QEasingCurve
-from PySide6.QtGui import QPixmap, QColor, QPainter, QPainterPath
+from PySide6.QtGui import QPixmap, QColor, QPainter, QPainterPath, QIcon
 from app.services import fetch_artist_bio_from_lastfm
 from app.subsonic import SubsonicClient
 from app.translations import translate
@@ -13,7 +13,8 @@ LASTFM_API_KEY = "6e7807c08e2b0515d717009115b12d42"
 
 
 class ArtistDetailsLoader(QThread):
-    loaded = Signal(int, object, object, str)
+    loaded = Signal(int, object, object)
+    bio_loaded = Signal(int, object, str)
     failed = Signal(int, object, str)
 
     def __init__(
@@ -36,8 +37,9 @@ class ArtistDetailsLoader(QThread):
             self.failed.emit(self.request_id, self.artist_id, str(exc))
             return
 
+        self.loaded.emit(self.request_id, self.artist_id, artist_info)
         bio = fetch_artist_bio_from_lastfm(self.artist_name, LASTFM_API_KEY)
-        self.loaded.emit(self.request_id, self.artist_id, artist_info, bio)
+        self.bio_loaded.emit(self.request_id, self.artist_id, bio)
 
 
 class SearchLoader(QThread):
@@ -65,6 +67,8 @@ class MainWindowLibrary:
         if not index.isValid(): return
         
         row = index.row()
+        if not 0 <= row < len(self.songs_data):
+            return
         song = self.songs_data[row]
         
         menu = QMenu()
@@ -82,7 +86,11 @@ class MainWindowLibrary:
             self.player.add_to_queue(song, self.client, play_next=False)
             self.populate_queue_table()
         elif action == like_action:
-            self.client.star_song(song["id"], True)
+            try:
+                self.client.star_song(song["id"], True)
+            except Exception as exc:
+                QMessageBox.warning(self, self.text("like_failed"), str(exc))
+                return
             self.load_liked_songs()
         elif action == add_to_playlist_action:
             self.prompt_add_to_playlist(song["id"])
@@ -117,7 +125,13 @@ class MainWindowLibrary:
         if ok and name:
             for p in self.current_playlists:
                 if p["name"] == name:
-                    self.client.update_playlist(p["id"], song_id_to_add=song_id)
+                    try:
+                        self.client.update_playlist(
+                            p["id"], song_id_to_add=song_id
+                        )
+                    except Exception as exc:
+                        QMessageBox.warning(self, self.text("error"), str(exc))
+                        return
                     QMessageBox.information(
                         self,
                         self.text("success"),
@@ -132,8 +146,8 @@ class MainWindowLibrary:
             self.open_settings()
             return
 
-        self.switch_view(7)
         self.showing_liked_songs = True
+        self.switch_view(7)
         self.current_playlist_id = None
         self.pd_type.setText(self.text("collection"))
         self.pd_title.setText(self.text("liked_songs"))
@@ -150,7 +164,13 @@ class MainWindowLibrary:
         if not self.client:
             return
 
-        self.liked_songs_data = self.client.get_starred_songs()
+        try:
+            liked_songs = self.client.get_starred_songs()
+        except Exception as exc:
+            QMessageBox.warning(self, self.text("error"), str(exc))
+            return
+
+        self.liked_songs_data = liked_songs
         self.pd_meta.setText(
             self.text("songs_count", count=len(self.liked_songs_data))
         )
@@ -178,16 +198,22 @@ class MainWindowLibrary:
 
         playlist_id = item.data(Qt.UserRole)
         playlist_name = item.text()
+
+        try:
+            playlist_songs = self.client.get_playlist_songs(playlist_id)
+        except Exception as exc:
+            QMessageBox.warning(self, self.text("error"), str(exc))
+            return
         
-        self.switch_view(7)
         self.showing_liked_songs = False
+        self.switch_view(7)
         self.current_playlist_id = playlist_id
         self.pd_type.setText(self.text("playlist").upper())
         self.pd_title.setText(playlist_name)
         self.pd_icon.setStyleSheet("background-color: #1A1F2B; border-radius: 10px;")
         self.pd_icon.setPixmap(QPixmap()) 
         
-        self.current_playlist_songs = self.client.get_playlist_songs(playlist_id)
+        self.current_playlist_songs = playlist_songs
         self.pd_meta.setText(
             self.text("songs_count", count=len(self.current_playlist_songs))
         )
@@ -214,17 +240,23 @@ class MainWindowLibrary:
             )
             self.play_songs(songs, index.row())
     def toggle_like_current_song(self):
-        if not self.current_song_id: return
+        if not self.client or not self.current_song_id:
+            return
         
-        if self.btn_like.text() == "♡":
-            self.client.star_song(self.current_song_id, True)
+        should_star = self.btn_like.text() == "♡"
+        try:
+            self.client.star_song(self.current_song_id, should_star)
+        except Exception as exc:
+            QMessageBox.warning(self, self.text("like_failed"), str(exc))
+            return
+
+        if should_star:
             self.btn_like.setText("♥")
             self.btn_like.setToolTip(self.text("unlike"))
             self.btn_like.setStyleSheet(
                 f"color: {self.accent_color}; font-size: 20px;"
             )
         else:
-            self.client.star_song(self.current_song_id, False)
             self.btn_like.setText("♡")
             self.btn_like.setToolTip(self.text("like"))
             self.btn_like.setStyleSheet("color: #94A3B8; font-size: 20px;")
@@ -277,6 +309,12 @@ class MainWindowLibrary:
             )
             event.accept()
     def open_album_details(self, album):
+        try:
+            album_songs = self.client.get_album_songs(album["id"])
+        except Exception as exc:
+            QMessageBox.warning(self, self.text("error"), str(exc))
+            return
+
         self.switch_view(5)
         self.current_album_id = album["id"]
         self.ad_title.setText(album.get("name", self.text("unknown")))
@@ -306,7 +344,7 @@ class MainWindowLibrary:
         else:
             self.ad_art.clear()
 
-        self.current_album_songs = self.client.get_album_songs(self.current_album_id)
+        self.current_album_songs = album_songs
         self.ad_table.setRowCount(0)
         self.ad_table.setRowCount(len(self.current_album_songs))
         
@@ -438,9 +476,11 @@ class MainWindowLibrary:
         self.art_bio.setText(self.text("loading_artist"))
         self.art_image.clear()
         
+        self.stop_album_animations()
         for i in reversed(range(self.artist_albums_grid.count())): 
             widget = self.artist_albums_grid.itemAt(i).widget()
-            if widget: widget.setParent(None)
+            if widget:
+                widget.deleteLater()
 
         self.artist_details_request_id += 1
         loader = ArtistDetailsLoader(
@@ -450,19 +490,19 @@ class MainWindowLibrary:
             artist_name,
         )
         loader.loaded.connect(self.on_artist_details_loaded)
+        loader.bio_loaded.connect(self.on_artist_bio_loaded)
         loader.failed.connect(self.on_artist_details_failed)
         self.keep_background_worker(loader)
         loader.start()
 
-    @Slot(int, object, object, str)
-    def on_artist_details_loaded(self, request_id, artist_id, artist_info, bio):
+    @Slot(int, object, object)
+    def on_artist_details_loaded(self, request_id, artist_id, artist_info):
         if (
             request_id != self.artist_details_request_id
             or artist_id != self.current_artist_id
         ):
             return
 
-        self.art_bio.setText(bio if bio else self.text("no_biography"))
         cover_id = artist_info.get("coverArt")
         if cover_id:
             self.load_cover_art(
@@ -472,7 +512,26 @@ class MainWindowLibrary:
                     self.on_artist_art_downloaded(data, requested_artist_id),
             )
 
-        self.current_artist_albums = artist_info.get("album", [])
+        album_covers = {
+            str(album["id"]): album["coverArt"]
+            for album in self.albums_data
+            if album.get("id") and album.get("coverArt")
+        }
+        for song in self.songs_data:
+            album_id = song.get("albumId")
+            cover_id = song.get("coverArt")
+            if album_id and cover_id:
+                album_covers.setdefault(str(album_id), cover_id)
+
+        self.current_artist_albums = []
+        for album in artist_info.get("album", []):
+            artist_album = dict(album)
+            if not artist_album.get("coverArt"):
+                cover_id = album_covers.get(str(artist_album.get("id")))
+                if cover_id:
+                    artist_album["coverArt"] = cover_id
+            self.current_artist_albums.append(artist_album)
+
         row, col = 0, 0
         for album in self.current_artist_albums:
             self.add_album_card(album, self.artist_albums_grid, row, col)
@@ -480,7 +539,16 @@ class MainWindowLibrary:
             if col > 2:
                 col = 0
                 row += 1
-        self.load_visible_album_art()
+        QTimer.singleShot(0, self.load_visible_album_art)
+
+    @Slot(int, object, str)
+    def on_artist_bio_loaded(self, request_id, artist_id, bio):
+        if (
+            request_id != self.artist_details_request_id
+            or artist_id != self.current_artist_id
+        ):
+            return
+        self.art_bio.setText(bio if bio else self.text("no_biography"))
 
     @Slot(int, object, str)
     def on_artist_details_failed(self, request_id, artist_id, message):
@@ -589,13 +657,49 @@ class MainWindowLibrary:
         self.search_results_data = songs
         self.search_results_list.clear()
         for song in songs:
+            title = song.get("title", self.text("unknown"))
+            artist = song.get("artist", self.text("unknown"))
+            album = song.get("album") or song.get("albumName") or self.text("unknown")
             item = QListWidgetItem(
-                f"{song.get('title', self.text('unknown'))}    —    "
-                f"{song.get('artist', self.text('unknown'))}"
+                f"{title}    —    {artist}\n{album}"
             )
             item.setData(Qt.UserRole, song)
+            item.setSizeHint(QSize(0, 76))
             self.search_results_list.addItem(item)
+            cover_id = song.get("coverArt")
+            if cover_id:
+                self.load_cover_art(
+                    str(cover_id),
+                    96,
+                    lambda data, search_id=request_id, song_id=song.get("id"):
+                        self.on_search_art_downloaded(
+                            data, search_id, song_id
+                        ),
+                )
         self.switch_view(4)
+
+    def on_search_art_downloaded(self, data, request_id, song_id):
+        if (
+            not data
+            or request_id != self.search_request_id
+            or not song_id
+        ):
+            return
+
+        pixmap = QPixmap()
+        if not pixmap.loadFromData(data):
+            return
+
+        icon = QIcon(
+            pixmap.scaled(
+                56, 56, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+        )
+        for row in range(self.search_results_list.count()):
+            item = self.search_results_list.item(row)
+            song = item.data(Qt.UserRole)
+            if isinstance(song, dict) and song.get("id") == song_id:
+                item.setIcon(icon)
 
     @Slot(int, str, str)
     def on_search_failed(self, request_id, query, message):
@@ -606,6 +710,13 @@ class MainWindowLibrary:
         self.search_results_list.addItem(self.text("search_failed"))
         QMessageBox.warning(self, self.text("search_failed_title"), message)
         self.switch_view(4)
+    def stop_album_animations(self):
+        animations = getattr(self, "album_animations", [])
+        for animation in animations[:]:
+            animation.stop()
+            animation.deleteLater()
+        animations.clear()
+
     def animate_album_click(self, widget, on_finished=None):
         rect = widget.geometry()
         animation = QPropertyAnimation(widget, b"geometry", self)
