@@ -67,7 +67,7 @@ class SettingsDialog(QDialog):
         self.url_label = QLabel()
         self.url_label.setObjectName("inputLabel")
         self.server_input = QLineEdit()
-        self.server_input.setPlaceholderText("https://music.example.com")
+        self.server_input.setPlaceholderText("http:// or https:// depending on your server")
         self.server_input.setText(current_settings.get("server", ""))
         self.server_input.setFixedHeight(50) # Force height
         layout.addWidget(self.url_label)
